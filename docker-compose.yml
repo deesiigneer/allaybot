@@ -2,7 +2,7 @@ version: '3'
 
 services:
   python:
-    container_name: vityaaaa_pass_discord_bot
+    container_name: allaybot_discord
     build: .
     restart: unless-stopped
     env_file:
