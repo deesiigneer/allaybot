@@ -8,7 +8,7 @@ from sys import exc_info
 
 class ButtonRecruiting(View):
 
-    def __int__(self):
+    def __init__(self):
         super().__init__(timeout=None)
 
     @button(label='Оставить заявку', emoji='👋', style=ButtonStyle.green, row=1, custom_id='recruiting_to_city')
