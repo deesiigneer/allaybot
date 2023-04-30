@@ -170,8 +170,9 @@ class ApplicationToCityButtons(View):
             button.label = 'Начать прием заявок'
             button.style = ButtonStyle.green
         await update_panel(interaction.client, interaction.guild)
+        embed = await update_applications_panel(interaction.client, interaction.guild)
         await interaction.edit(view=ApplicationToCityButtons(interaction),
-                               embed=await update_applications_panel(interaction.client, interaction.guild))
+                               embed=embed)
 
 
 class ResumeEdit(View):
