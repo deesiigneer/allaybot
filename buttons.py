@@ -432,7 +432,7 @@ class RecruitingModal(Modal):
             for label in self.labels:
                 preview_labels.append(label.value)
             update_resume_preview = await update_resume_preview(interaction, preview_labels)
-            await channel.send(embed=await update_resume_preview[0])
+            await channel.send(embed=update_resume_preview[0])
 
 
 # class application_to_city_modal2(Modal):
