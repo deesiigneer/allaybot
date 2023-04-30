@@ -5,6 +5,7 @@ from nextcord import ButtonStyle, Interaction, Embed, Role, Emoji, PermissionOve
 from database import sql
 from sys import exc_info
 
+
 class ButtonRecruiting(View):
 
     def __int__(self):
@@ -15,7 +16,6 @@ class ButtonRecruiting(View):
         await interaction.response.send_modal(RecruitingModal(guild=interaction.guild,
                                                               preview=False,
                                                               interaction=interaction))
-
 
 
 class BotPanelButtons(View):

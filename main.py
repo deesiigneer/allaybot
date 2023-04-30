@@ -24,12 +24,13 @@ class Bot(commands.Bot):
     async def on_ready(self):
         if not self.persistent_views_added:
             self.persistent_views_added = True
-            from buttons import BotPanelButtons, ApplicationToCityButtons, CreateReqruiting, ExtendedInstallation, \
-                ResumeEdit
+            from buttons import ButtonRecruiting, BotPanelButtons, CreateReqruiting, ExtendedInstallation, \
+                ApplicationToCityButtons, ResumeEdit
+            self.add_view(ButtonRecruiting())
             self.add_view(BotPanelButtons())
-            self.add_view(ApplicationToCityButtons())
             self.add_view(CreateReqruiting())
             self.add_view(ExtendedInstallation())
+            self.add_view(ApplicationToCityButtons())
             self.add_view(ResumeEdit())
 
         await self.change_presence(
