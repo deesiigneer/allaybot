@@ -57,7 +57,7 @@ class Bot(commands.Bot):
         await client.sync_application_commands(guild_id=guild.id)
         try:
             guild_bot = guild.get_member(self.user.id)
-            sql_guild: list = sql.get_guilds(guild.id)
+            sql_guild: list = sql.get_guild(guild.id)
             panel_channel = None
             resume_channel = None
             citlist_channel = None
