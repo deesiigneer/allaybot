@@ -1,4 +1,5 @@
 import aiohttp
+import nextcord.errors
 from nextcord.ext.commands.bot import Bot
 from nextcord import Interaction, Embed, Colour, slash_command, Role, SlashOption, Webhook, Attachment, TextChannel
 from nextcord.ext import commands
@@ -8,7 +9,6 @@ from sys import exc_info
 import buttons
 from database import sql
 from handler import update_panel
-
 
 guilds = sql.get_guilds()
 
@@ -26,7 +26,7 @@ class GeneralCommands(commands.Cog):
         try:
             sql_guild = sql.get_guild(interaction.guild.id)
             if sql_guild is not None:
-                if sql_guild[4] == role.id:
+                if sql_guild[2] == role.id:
                     await interaction.send(
                         content=f'{role.mention} уже используется как роль жителя для города {interaction.guild.name}',
                         ephemeral=True)
@@ -52,43 +52,43 @@ class GeneralCommands(commands.Cog):
 
     @slash_command(description='Канал в который будут поступать заявки.')
     async def resume(self, interaction: Interaction,
-                     channel: TextChannel = SlashOption(name='channel',description='Канал в который будут поступать заявки', required=True)):
+                     channel: TextChannel = SlashOption(name='channel',
+                                                        description='Канал в который будут поступать заявки',
+                                                        required=True)):
         sql_recruiting = sql.get_recruiting(interaction.guild.id)
         if sql_recruiting is not None:
             sql.update_recruiting(interaction.guild.id,
                                   sql_recruiting[1],
+                                  sql_recruiting[4],
                                   channel.id,
                                   False)
+            if sql.get_resume_fields_order_by_row(interaction.guild.id) is []:
+                sql.add_resume_field(interaction.guild.id, 'nickname', 'deesiigneer', False, True, 0)
             from handler import update_panel
             # sql_guid = sql.get_guild(interaction.guild.id)
             await update_panel(interaction.client, interaction.guild)
+            await interaction.send(f'{channel.mention} был установлен как канал в котором будут появляться заявки.',
+                                   ephemeral=True)
             # TODO: доделать ответ
             # channel = interaction.guild.get_channel(sql_guid[1])
             # async for message in channel.history(oldest_first=True):
             #     if message.author == interaction.client:
             #         await message.edit(embed=update_panel[])
 
-    @slash_command(description='Канал который будет использоваться для подачи заявок в город')
+    @slash_command(description="EDIT ABOUT")
     async def recruiting(self,
                          interaction: Interaction,
-                         channel: TextChannel = SlashOption(
-                             name='channel',
-                             description='Канал который будет использоваться для подачи заявок в город.',
-                             required=True),
                          file: Attachment = SlashOption(
                              name='embed_file',
                              description='.json файл с сайта discohook.org',
-                             required=True),
-                         message: str = SlashOption(
-                             name='message_url',
-                             description='Редактирование сообщения по ссылке.',
-                             required=False)):
-        print('content-type', file.content_type)
+                             required=True)):
         if file.filename.endswith('.json') and 'application/json' in file.content_type:
-
             async with aiohttp.ClientSession() as session:
                 # print(await file.read(use_cached=True))
                 async with session.get(file.url) as response:
+                    sql_recruiting = sql.get_recruiting(interaction.guild.id)
+                    message = None
+                    channel = None
                     data = await response.json()
                     embeds = []
                     for index, embed in enumerate(data['embeds']):
@@ -102,37 +102,46 @@ class GeneralCommands(commands.Cog):
                                                'icon_url': interaction.client.user.avatar.url,
                                                'url': 'https://discord.gg/VbyHaKRAaN'}
                         embeds.append(Embed.from_dict(embed))
-                    if message is None:
+                    if sql_recruiting:
+                        if sql_recruiting[1] is not None:
+                            channel = await interaction.guild.fetch_channel(sql_recruiting[1])
+                        if sql_recruiting[4] is not None:
+                            message = await channel.fetch_message(sql_recruiting[4])
+                    print('message is ', message)
+                    if sql_recruiting is None and message is None:
                         if data['content'] is not None:
                             message = await channel.send(content=data['content'],
                                                          embeds=embeds,
-                                                         view=buttons.ButtonRecruiting())
+                                                         view=buttons.ButtonRecruiting(guild=interaction.guild))
                         else:
                             message = await channel.send(embeds=embeds,
-                                                         view=buttons.ButtonRecruiting())
-                        sql.add_recruiting(interaction.guild, message.channel.id, status=False)
-                        await interaction.send(content=f'{message.jump_url} был успешно опубликован.', ephemeral=True)
-                    elif message is not None:
-                        channel = message.split(sep='/')[5]
-                        message = message.split(sep='/')[6]
-                        if channel is not None and channel.isdigit():
-                            channel = interaction.guild.get_channel(int(channel))
-                            if channel is not None and message is not None and message.isdigit():
-                                message = channel.get_partial_message(int(message))
-                                if data['content'] is not None:
-                                    await message.edit(content=data['content'],
-                                                               view=buttons.ButtonRecruiting(),
-                                                               embeds=embeds)
-                                else:
-                                    await message.edit(view=buttons.ButtonRecruiting(),
-                                                               embeds=embeds)
-                                sql_recruiting = sql.get_recruiting(interaction.guild.id)
-                                sql.update_recruiting(interaction.guild.id,
-                                                      channel.id,
-                                                      str(sql_recruiting[2]),
-                                                      bool(sql_recruiting[3]))
-                                await interaction.send(f"{message.jump_url} был успешно отредактирован.",
-                                                       ephemeral=True)
+                                                         view=buttons.ButtonRecruiting(guild=interaction.guild))
+                        sql.add_recruiting(interaction.guild.id,
+                                           message.channel.id,
+                                           message.id,
+                                           sql_recruiting[2] if sql_recruiting is not None else None,
+                                           status=False)
+                        await interaction.send(content=f'{message.jump_url} был успешно опубликован.',
+                                               ephemeral=True)
+                        from handler import update_panel
+                        await update_panel(interaction.client, interaction.guild)
+                    elif sql_recruiting is not None and message is not None:
+                        if data['content'] is not None:
+                            await message.edit(content=data['content'],
+                                               view=buttons.ButtonRecruiting(interaction.guild),
+                                               embeds=embeds)
+                        else:
+                            await message.edit(view=buttons.ButtonRecruiting(interaction.guild),
+                                               embeds=embeds)
+                        sql.update_recruiting(interaction.guild.id,
+                                              channel.id,
+                                              message.id,
+                                              sql_recruiting[2] if sql_recruiting[2] is not None else None,
+                                              sql_recruiting[3])
+                        await interaction.send(f"{message.jump_url} был успешно отредактирован.",
+                                               ephemeral=True)
+                        from handler import update_panel
+                        await update_panel(interaction.client, interaction.guild)
         else:
             if interaction.response.is_done() is False:
                 await interaction.send(f"Команда принимает только `.json` файлы",

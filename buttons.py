@@ -1,3 +1,4 @@
+import nextcord
 from nextcord.ui import View, Select, Modal, Button, button, TextInput
 from nextcord.utils import find
 from nextcord import ButtonStyle, Interaction, Embed, Role, Emoji, PermissionOverwrite, Guild, SelectOption, \
@@ -8,8 +9,15 @@ from sys import exc_info
 
 class ButtonRecruiting(View):
 
-    def __init__(self):
+    def __init__(self, guild: Guild = None):
         super().__init__(timeout=None)
+        sql_recruiting = sql.get_recruiting(guild_id=guild.id) if guild is not None else None
+        self.recruiting_to_city.disabled = True
+        print('ButtonRecruiting1', sql_recruiting)
+        if sql_recruiting:
+            print('ButtonRecruiting2', sql_recruiting[3])
+            if sql_recruiting[3] is True:
+                self.recruiting_to_city.disabled = False
 
     @button(label='Оставить заявку', emoji='👋', style=ButtonStyle.green, row=1, custom_id='recruiting_to_city')
     async def recruiting_to_city(self, button: Button, interaction: Interaction):
@@ -23,10 +31,10 @@ class BotPanelButtons(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @button(label='Заявки в город', emoji='👋', style=ButtonStyle.blurple, row=1, custom_id='application_to_city')
+    @button(label='Набор в город', emoji='👋', style=ButtonStyle.blurple, row=1, custom_id='application_to_city')
     async def application_to_city(self, button: Button, interaction: Interaction):
-        sql_recruiting = sql.get_recruiting(interaction.guild.id)
         from handler import update_applications_panel
+        sql_recruiting = sql.get_recruiting(interaction.guild.id)
         embeds = [await update_applications_panel(interaction.client, interaction.guild)]
         if sql_recruiting:
             await interaction.response.send_message(embeds=embeds,
@@ -34,7 +42,7 @@ class BotPanelButtons(View):
                                                     ephemeral=True)
             #  TODO
         else:
-            await interaction.send(content=f'Заявки для города `{interaction.guild.name}` ещё не установлены',
+            await interaction.send(content=f'Модуль `Набор в город` для `{interaction.guild.name}` ещё не установлены',
                                    embeds=embeds,
                                    view=CreateReqruiting(interaction),
                                    ephemeral=True)
@@ -48,7 +56,10 @@ class BotPanelButtons(View):
     @button(label='Обновить', emoji='🔃', style=ButtonStyle.blurple, row=2, custom_id='settings_panel_update')
     async def update(self, button: Button, interaction: Interaction):
         try:
-            from handler import update_panel
+            from handler import update_panel, Check
+            channel = interaction.guild.get_channel(interaction.channel.id)
+            await Check(interaction.client, interaction.guild).comparison_database_to_guild(interaction, channel,
+                                                                                            interaction.message)
             await update_panel(interaction.client, interaction.guild)
             await  interaction.message.edit(view=BotPanelButtons())
             # await interaction.edit(embeds=embeds, view=BotPanelButtons())
@@ -64,7 +75,7 @@ class CreateReqruiting(View):
         self.sql_recruiting = None
         if self.interaction is not None:
             self.sql_recruiting = sql.get_recruiting(self.interaction.guild.id)
-        self.add_item(ExtendedInstallationSelect())
+        # self.add_item(ExtendedInstallationSelect())
 
     @button(label='Расширенная установка', style=ButtonStyle.blurple, row=1, custom_id='extended_installation')
     async def extended_installation(self, button: Button, interaction: Interaction):
@@ -73,26 +84,74 @@ class CreateReqruiting(View):
 
     @button(label='Упрощенная установка', style=ButtonStyle.blurple, row=1, custom_id='simplified_installation')
     async def simplified_installation(self, button: Button, interaction: Interaction):
-        pass
-        # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
-        # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
+        # button.disabled = True
+        # self.extended_installation.disabled = True
+        # await interaction.edit(view=self)
+        button.disabled = True
+        self.extended_installation.disabled = True
+        await interaction.edit(view=self)
+        sql_guild = sql.get_guild(interaction.guild.id)
+        if sql_guild:
+            if sql_guild[2] is not None:
+                citizen = interaction.guild.get_role(sql_guild[2])
+                applcation_to_city_category = await interaction.guild.create_category('👷Набор в город')
+                recruiting_channel = await applcation_to_city_category.create_text_channel(name='👋ㆍнабор-в-город')
+                resume_channel = await applcation_to_city_category.create_text_channel(name='👷ㆍзаявки-в-город')
+                await resume_channel.set_permissions(target=citizen, overwrite=nextcord.PermissionOverwrite(
+                    read_messages=True,
+                    read_message_history=True,
+                    send_messages=False,
+                    view_channel=True))
+                await recruiting_channel.set_permissions(target=citizen, overwrite=nextcord.PermissionOverwrite(
+                    view_channel=False))
+                embed = Embed(title=f'Набор в город {interaction.guild.name}!',
+                              description=f'Нажмите кнопку ниже и заполните форму, для подачи заявки в замечательный '
+                                          f'город **{interaction.guild.name}**!',
+                              color=0x2f3136)
+                if interaction.guild.icon is not None:
+                    embed.set_thumbnail(url=interaction.guild.icon.url)
+                else:
+                    embed.set_thumbnail('https://static.wikia.nocookie.net/minecraft_gamepedia/images/4/45/Allay_JE2.gif')
+                if interaction.guild.banner is not None:
+                    embed.set_image(url=interaction.guild.banner.url)
+                embed.set_author(name=f'powered by {interaction.client.user.name}',
+                                 icon_url=interaction.client.user.avatar.url,
+                                 url='https://discord.gg/VbyHaKRAaN')
+                recruiting_message = await recruiting_channel.send(embed=embed,
+                                                                   view=ButtonRecruiting(interaction.guild))
+                sql.add_recruiting(interaction.guild.id, recruiting_channel.id, recruiting_message.id, resume_channel.id,
+                                   False)
+                sql_resume = sql.get_resume_fields_order_by_row(interaction.guild.id)
+                print('sql_resume', sql_resume)
+                if not sql_resume:
+                    sql.add_resume_field(interaction.guild.id, 'nickname', 'deesiigneer', False, True, 0)
+                await recruiting_message.edit(view=ButtonRecruiting(interaction.guild))
+                await interaction.send(f'Были созданы каналы:\n'
+                                       f'{recruiting_channel.mention} - о городе, где находится кнопка для подачи '
+                                       f'заявки в город {interaction.guild.name}\n'
+                                       f'{resume_channel.mention} - где будут собираться заявки\n\n'
+                                       f'Нажмите кнопку "👋 Набор в город", что бы продолжить редактирование.', ephemeral=True)
+            else:
+                await interaction.send(f'Роль жителя не установлена для города {interaction.guild.name}!\n\n'
+                                       f'Что бы установить используйте `/citizen`',
+                                       ephemeral=True)
 
 
-class ExtendedInstallation(View):
-
-    def __init__(self, interaction: Interaction = None):
-        super().__init__(timeout=None)
-        self.interaction = interaction if interaction is not None else None
-
-    @button(label='Сохранить', style=ButtonStyle.green, row=1, custom_id='extended_installation')
-    async def extended_installation(self, button: Button, interaction: Interaction):
-        await self.interaction.edit_original_message(view=self.interaction)
-        self.stop()
-        # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
-
-    @button(label='Назад', style=ButtonStyle.blurple, row=1, custom_id='simplified_installation')
-    async def simplified_installation(self, button: Button, interaction: Interaction):
-        await self.interaction.edit_original_message(view=CreateReqruiting(self.interaction))
+# class ExtendedInstallation(View):
+#
+#     def __init__(self, interaction: Interaction = None):
+#         super().__init__(timeout=None)
+#         self.interaction = interaction if interaction is not None else None
+#
+#     @button(label='Сохранить', style=ButtonStyle.green, row=1, custom_id='extended_installation')
+#     async def extended_installation(self, button: Button, interaction: Interaction):
+#         await self.interaction.edit_original_message(view=self.interaction)
+#         self.stop()
+#         # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
+#
+#     @button(label='Назад', style=ButtonStyle.blurple, row=1, custom_id='simplified_installation')
+#     async def simplified_installation(self, button: Button, interaction: Interaction):
+#         await self.interaction.edit_original_message(view=CreateReqruiting(self.interaction))
         # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
         # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
 
@@ -159,9 +218,9 @@ class ApplicationToCityButtons(View):
             self.sql_recruiting = sql.get_recruiting(interaction.guild.id)
         sql.update_recruiting(guild_id=interaction.guild.id,
                               recruiting_channel_id=self.sql_recruiting[1],
+                              recruiting_message_id=self.sql_recruiting[4],
                               resume_channel_id=self.sql_recruiting[2],
-                              status=False if bool(self.sql_recruiting[3]) is True else True,
-                              recruiting_webhook=self.sql_recruiting[4])
+                              status=False if bool(self.sql_recruiting[3]) is True else True)
         from handler import update_panel, update_applications_panel
         if self.sql_recruiting is not None and self.sql_recruiting[3] is True:
             button.label = 'Остановить прием заявок'
@@ -173,6 +232,8 @@ class ApplicationToCityButtons(View):
         embed = await update_applications_panel(interaction.client, interaction.guild)
         await interaction.edit(view=ApplicationToCityButtons(interaction),
                                embed=embed)
+        message = interaction.guild.get_channel(self.sql_recruiting[1]).get_partial_message(self.sql_recruiting[4])
+        await message.edit(view=ButtonRecruiting(interaction.guild))
 
 
 class ResumeEdit(View):
@@ -432,10 +493,12 @@ class RecruitingModal(Modal):
             preview_labels = []
             for label in self.labels:
                 preview_labels.append(label.value)
-            update_resume_preview = await update_resume_preview(interaction, preview_labels)
+            update_resume_preview = await update_resume_preview(interaction, preview_labels, channel)
             message = await channel.send(embed=update_resume_preview[0])
             await message.add_reaction(interaction.client.get_emoji(1102183935762497546))
             await message.add_reaction(interaction.client.get_emoji(1102183934101553222))
+            await interaction.send(f'{interaction.user.mention}, ваша заявка была отправлена! '
+                                   f'Ожидайте её рассмотрения.', ephemeral=True)
 
 
 # class application_to_city_modal2(Modal):
