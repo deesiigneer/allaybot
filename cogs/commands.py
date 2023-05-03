@@ -95,6 +95,12 @@ class GeneralCommands(commands.Cog):
         await guild.leave()
         await interaction.send(f'leaved from {guild.name} ||{guild.id}||')
 
+    @slash_command(description='for bot owner only.', guild_ids=[850091193190973472])
+    @application_checks.is_owner()
+    async def guilds(self, interaction: Interaction):
+        guilds = interaction.client.guilds
+        await interaction.send(f'{[guild for guild in guilds]}')
+
     @slash_command(description="EDIT ABOUT")
     @application_checks.has_permissions(administrator=True)
     async def recruiting(self,
