@@ -86,7 +86,7 @@ class Database(object):
         SET panel_channel_id = %s, panel_message_id = %s, citizen_role_id = %s
         WHERE guild_id = %s
         """,
-                         [panel_channel_id, citizen_role_id, panel_message_id, guild_id])
+                         [panel_channel_id, panel_message_id, citizen_role_id, guild_id])
         return self.connection.commit()
 
     def update_recruiting(self, guild_id: int, recruiting_channel_id: int, recruiting_message_id: int,

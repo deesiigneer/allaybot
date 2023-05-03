@@ -87,22 +87,11 @@ class CreateReqruiting(View):
         # self.extended_installation.disabled = True
         # await interaction.edit(view=self)
         button.disabled = True
-        self.extended_installation.disabled = True
+        # self.extended_installation.disabled = True
         await interaction.edit(view=self)
         sql_guild = sql.get_guild(interaction.guild.id)
         if sql_guild:
             if sql_guild[2] is not None:
-                citizen = interaction.guild.get_role(sql_guild[2])
-                applcation_to_city_category = await interaction.guild.create_category('👷Набор в город')
-                recruiting_channel = await applcation_to_city_category.create_text_channel(name='👋ㆍнабор-в-город')
-                resume_channel = await applcation_to_city_category.create_text_channel(name='👷ㆍзаявки-в-город')
-                await resume_channel.set_permissions(target=citizen, overwrite=nextcord.PermissionOverwrite(
-                    read_messages=True,
-                    read_message_history=True,
-                    send_messages=False,
-                    view_channel=True))
-                await recruiting_channel.set_permissions(target=citizen, overwrite=nextcord.PermissionOverwrite(
-                    view_channel=False))
                 embed = Embed(title=f'Набор в город {interaction.guild.name}!',
                               description=f'Нажмите кнопку ниже и заполните форму, для подачи заявки в замечательный '
                                           f'город **{interaction.guild.name}**!',
@@ -116,6 +105,21 @@ class CreateReqruiting(View):
                 embed.set_author(name=f'powered by {interaction.client.user.name}',
                                  icon_url=interaction.client.user.avatar.url,
                                  url='https://discord.gg/VbyHaKRAaN')
+                citizen = interaction.guild.get_role(sql_guild[2])
+                application_to_city_category = await interaction.guild.create_category('👷Набор в город')
+                recruiting_channel = await application_to_city_category.create_text_channel(
+                    name='👋ㆍнабор-в-город',
+                    overwrites={interaction.guild.default_role: nextcord.PermissionOverwrite(read_messages=True,
+                                                                                             send_messages=False)})
+                resume_channel = await application_to_city_category.create_text_channel(
+                    name='👷ㆍзаявки-в-город',
+                    overwrites={interaction.guild.default_role: nextcord.PermissionOverwrite(read_messages=False),
+                                interaction.guild.me: nextcord.PermissionOverwrite(read_messages=True),
+                                citizen: nextcord.PermissionOverwrite(
+                                    read_messages=True,
+                                    read_message_history=True,
+                                    send_messages=False,
+                                    view_channel=True)})
                 recruiting_message = await recruiting_channel.send(embed=embed,
                                                                    view=ButtonRecruiting(interaction.guild))
                 sql.add_recruiting(interaction.guild.id, recruiting_channel.id, recruiting_message.id, resume_channel.id,

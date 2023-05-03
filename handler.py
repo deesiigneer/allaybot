@@ -122,13 +122,14 @@ async def update_panel(bot: commands.Bot, guild: Guild) -> None:
                         inline=False)
         embeds = [embed]
         msg = None
+        #  TODO: rewrite msg
         async for message in panel_channel.history(limit=100, oldest_first=True):
             if message.author == bot.user:
                 from buttons import BotPanelButtons
                 msg = await message.edit(embeds=embeds, view=BotPanelButtons())
         if msg is None:
             from buttons import BotPanelButtons
-            await panel_channel.send(embeds=embeds, view=BotPanelButtons())
+            msg = await panel_channel.send(embeds=embeds, view=BotPanelButtons())
         sql.update_guild(
             guild.id,
             panel_channel.id if panel_channel is not None else None,
