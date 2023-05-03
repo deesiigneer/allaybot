@@ -85,6 +85,16 @@ class GeneralCommands(commands.Cog):
             f'members: {interaction.client.get_guild(guild).members}\n',
             ephemeral=True)
 
+    @slash_command(description='for bot owner only.', guild_ids=[850091193190973472])
+    @application_checks.is_owner()
+    async def leave(self, interaction: Interaction,
+                    guild: str = SlashOption(name='guild__id',
+                                            description='guild-id',
+                                            required=True)):
+        guild = interaction.client.get_guild(int(guild))
+        await guild.leave()
+        await interaction.send(f'leaved from {guild.name} ||{guild.id}||')
+
     @slash_command(description="EDIT ABOUT")
     @application_checks.has_permissions(administrator=True)
     async def recruiting(self,
