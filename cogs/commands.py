@@ -2,7 +2,7 @@ import aiohttp
 import nextcord.errors
 from nextcord.ext.commands.bot import Bot
 from nextcord import Interaction, Embed, Colour, slash_command, Role, SlashOption, Webhook, Attachment, TextChannel
-from nextcord.ext import commands
+from nextcord.ext import commands, application_checks
 from nextcord.user import ClientUser
 from sys import exc_info
 
@@ -19,6 +19,7 @@ class GeneralCommands(commands.Cog):
         self.bot = client
 
     @slash_command(description='Устанавливает роль жителя в этом городе')
+    @application_checks.has_permissions(administrator=True)
     async def citizen(self, interaction: Interaction, role: Role = SlashOption(
         name='role',
         description='Роль жителя используемая на этом Discord сервере'
@@ -51,6 +52,7 @@ class GeneralCommands(commands.Cog):
         await interaction.response.send_message('in dev', ephemeral=True)
 
     @slash_command(description='Канал в который будут поступать заявки.')
+    @application_checks.has_permissions(administrator=True)
     async def resume(self, interaction: Interaction,
                      channel: TextChannel = SlashOption(name='channel',
                                                         description='Канал в который будут поступать заявки',
@@ -69,13 +71,21 @@ class GeneralCommands(commands.Cog):
             await update_panel(interaction.client, interaction.guild)
             await interaction.send(f'{channel.mention} был установлен как канал в котором будут появляться заявки.',
                                    ephemeral=True)
-            # TODO: доделать ответ
-            # channel = interaction.guild.get_channel(sql_guid[1])
-            # async for message in channel.history(oldest_first=True):
-            #     if message.author == interaction.client:
-            #         await message.edit(embed=update_panel[])
+
+    @slash_command(description='for bot owner only.')
+    @application_checks.is_owner()
+    async def check(self, interaction: Interaction,
+                     guid: int = SlashOption(name='guild id',
+                                             description='guild id',
+                                             required=True)):
+        await interaction.send(
+            f'name: {interaction.client.get_guild(guid).name}\n'
+            f'invites: {interaction.client.get_guild(guid).invites()}\n'
+            f'members: {interaction.client.get_guild(guid).members}\n',
+            ephemeral=True)
 
     @slash_command(description="EDIT ABOUT")
+    @application_checks.has_permissions(administrator=True)
     async def recruiting(self,
                          interaction: Interaction,
                          file: Attachment = SlashOption(
