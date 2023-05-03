@@ -77,12 +77,11 @@ class CreateReqruiting(View):
             self.sql_recruiting = sql.get_recruiting(self.interaction.guild.id)
         # self.add_item(ExtendedInstallationSelect())
 
-    @button(label='Расширенная установка', style=ButtonStyle.blurple, row=1, custom_id='extended_installation')
-    async def extended_installation(self, button: Button, interaction: Interaction):
-        self.stop()
+    # @button(label='Расширенная установка', style=ButtonStyle.blurple, row=1, custom_id='extended_installation')
+    # async def extended_installation(self, button: Button, interaction: Interaction):
         # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
 
-    @button(label='Упрощенная установка', style=ButtonStyle.blurple, row=1, custom_id='simplified_installation')
+    @button(label='Установка модуля', style=ButtonStyle.blurple, row=1, custom_id='simplified_installation')
     async def simplified_installation(self, button: Button, interaction: Interaction):
         # button.disabled = True
         # self.extended_installation.disabled = True
