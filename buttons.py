@@ -499,7 +499,7 @@ class RecruitingModal(Modal):
             await message.add_reaction(interaction.client.get_emoji(1102183934101553222))
             thread = await interaction.channel.create_thread(name=f'Заявка-{interaction.user.display_name}',
                                                     type=ChannelType.private_thread)
-            await thread.send(embed=update_resume_preview)
+            await thread.send(embed=update_resume_preview[0])
             await thread.add_user(interaction.user)
             await thread.send(f'{interaction.user.mention}, ваша заявка была отправлена! '
                               f'Ожидайте её рассмотрения.', ephemeral=True)
