@@ -42,7 +42,7 @@ class Bot(commands.Bot):
         print(f'Logged in as {self.user} (ID: {self.user.id})')
         # print('guilds in service: ' + str([len(guilds) for guilds in sql.get_guilds()]))
         print(sql.version())
-        # await client.sync_application_commands(guild_id=850091193190973472)
+        # await client.sync_all_application_commands()
 
     async def on_close(self):
         print('CLOSE')

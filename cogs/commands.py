@@ -72,16 +72,17 @@ class GeneralCommands(commands.Cog):
             await interaction.send(f'{channel.mention} был установлен как канал в котором будут появляться заявки.',
                                    ephemeral=True)
 
-    @slash_command(description='for bot owner only.')
+    @slash_command(description='for bot owner only.', guild_ids=[850091193190973472])
     @application_checks.is_owner()
     async def check(self, interaction: Interaction,
-                     guid: int = SlashOption(name='guild id',
-                                             description='guild id',
-                                             required=True)):
+                    guild: str = SlashOption(name='guild__id',
+                                            description='guild-id',
+                                            required=True)):
+        guild = int(guild)
         await interaction.send(
-            f'name: {interaction.client.get_guild(guid).name}\n'
-            f'invites: {interaction.client.get_guild(guid).invites()}\n'
-            f'members: {interaction.client.get_guild(guid).members}\n',
+            f'name: {interaction.client.get_guild(guild).name}\n'
+            f'invites: {interaction.client.get_guild(guild).invites()}\n'
+            f'members: {interaction.client.get_guild(guild).members}\n',
             ephemeral=True)
 
     @slash_command(description="EDIT ABOUT")
