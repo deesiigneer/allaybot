@@ -18,7 +18,7 @@ class Check:
         self.log_channel = self.__log_guild.get_channel(1103024684003508274)
 
     async def comparison_database_to_guild(self, interaction: Interaction,
-                                           channel: TextChannel = None, message: PartialMessage | Message = None):
+                                           channel: TextChannel = None, message: Message = None):
         sql_guild = sql.get_guild(self.guild.id)
         if sql_guild:
             guild = self.bot.get_guild(sql_guild[0])
