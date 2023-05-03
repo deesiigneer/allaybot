@@ -539,15 +539,15 @@ class RecruitingModal(Modal):
                                                'Проверить статус API можно тут -'
                                                'https://uptime.deesiigneer.ru/status/spworlds', ephemeral=True)
             else:
+                thread = await interaction.channel.create_thread(name=f'Заявка-{interaction.user.display_name}',
+                                                        type=ChannelType.private_thread)
+                await thread.add_user(interaction.user)
+                await interaction.send(f'{interaction.user.mention}, ваша заявка была отправлена!\n'
+                                       f'Все действия по вашей заявке вы всегда можете посмотреть тут -> {thread.jump_url}', ephemeral=True)
                 message = await channel.send(embed=update_resume_preview[0])
                 await message.add_reaction(interaction.client.get_emoji(1102183935762497546))
                 await message.add_reaction(interaction.client.get_emoji(1102183934101553222))
-                thread = await interaction.channel.create_thread(name=f'Заявка-{interaction.user.display_name}',
-                                                        type=ChannelType.private_thread)
                 await thread.send(embed=update_resume_preview[0])
-                await thread.add_user(interaction.user)
-                await thread.send(f'{interaction.user.mention}, ваша заявка была отправлена! '
-                                  f'Ожидайте её рассмотрения.')
 
 
 # class application_to_city_modal2(Modal):
