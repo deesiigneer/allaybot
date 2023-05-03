@@ -81,7 +81,7 @@ class GeneralCommands(commands.Cog):
         guild = int(guild)
         await interaction.send(
             f'name: {interaction.client.get_guild(guild).name}\n'
-            f'invites: {interaction.client.get_guild(guild).invites()}\n'
+            f'invites: {[invite for invite in await interaction.client.get_guild(guild).invites()]}\n'
             f'members: {interaction.client.get_guild(guild).members}\n',
             ephemeral=True)
 
