@@ -2,7 +2,7 @@ import nextcord
 from nextcord.ui import View, Select, Modal, Button, button, TextInput
 from nextcord.utils import find
 from nextcord import ButtonStyle, Interaction, Embed, Role, Emoji, PermissionOverwrite, Guild, SelectOption, \
-    TextChannel, TextInputStyle
+    TextChannel, TextInputStyle, ChannelType
 from database import sql
 from sys import exc_info
 
@@ -497,8 +497,12 @@ class RecruitingModal(Modal):
             message = await channel.send(embed=update_resume_preview[0])
             await message.add_reaction(interaction.client.get_emoji(1102183935762497546))
             await message.add_reaction(interaction.client.get_emoji(1102183934101553222))
-            await interaction.send(f'{interaction.user.mention}, ваша заявка была отправлена! '
-                                   f'Ожидайте её рассмотрения.', ephemeral=True)
+            thread = await interaction.channel.create_thread(name=f'Заявка-{interaction.user.display_name}',
+                                                    type=ChannelType.private_thread)
+            await thread.send(embed=update_resume_preview)
+            await thread.add_user(interaction.user)
+            await thread.send(f'{interaction.user.mention}, ваша заявка была отправлена! '
+                              f'Ожидайте её рассмотрения.', ephemeral=True)
 
 
 # class application_to_city_modal2(Modal):

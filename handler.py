@@ -131,7 +131,9 @@ async def update_panel(bot: commands.Bot, guild: Guild) -> None:
         sql.update_guild(
             guild.id,
             panel_channel.id if panel_channel is not None else None,
-            citizen_role.id if citizen_role is not None else None
+            msg.id if msg is not None else None,
+            citizen_role.id if citizen_role is not None else None,
+
         )
         return
     except PermissionError as e:
