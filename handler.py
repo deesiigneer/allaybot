@@ -1,6 +1,7 @@
 from nextcord.ext import commands
 from nextcord import Guild, TextChannel, Role, Emoji, Embed, Interaction, PartialMessage, Message
 from database import sql
+from pyspapi import SPAPI, MojangAPI
 
 
 async def send_to_system_channel(guild: Guild, text: str):
@@ -170,12 +171,19 @@ async def update_applications_panel(bot: commands.Bot, guild: Guild):
 async def update_resume_preview(interaction: Interaction, preview_labels: list = None, channel: TextChannel = None):
     sql_user = sql.get_user(interaction.user.id)
     # TODO: проверка на никнейм by pyspapi
+    spapi = SPAPI('6273cba5-add3-44b8-a9a6-d528fcf0f29a', 'hQvWsc9FssggbtNXukG/3XbgNXtyTgos')
     embed = Embed(title=f'Заявка №{len(await channel.history().flatten()) if channel is not None else "ПРЕДПРОСМОТР"}',
                   description=f'От - {interaction.user.mention}',
                   color=0x2f3136)
     user = None
     if sql_user is not None:
         user = sql_user
+    else:
+        sp_user = spapi.get_user(interaction.user.id)
+        if sp_user is not None:
+            sql.add_user(interaction.user.id, MojangAPI().get_uuid(sp_user.username))
+        else:
+            return [None, None]
     embed.set_author(
         name=f'{interaction.user.nick if interaction.user.nick is not None else interaction.user.display_name}',
         url=f'https://namemc.com/profile/{user[1]}' if user is not None else None,

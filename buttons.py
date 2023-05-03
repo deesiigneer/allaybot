@@ -202,13 +202,16 @@ class ApplicationToCityButtons(View):
     async def recruiting_edit_resume(self, button: Button, interaction: Interaction):
         from handler import update_resume_preview
         update_resume_preview = await update_resume_preview(interaction)
-        if update_resume_preview[1]:
+        if update_resume_preview == [None, None]:
+            # TODO: express installation
+            await interaction.send(content='Извини дружище, видимо у тебя нет проходки на СПм '
+                                           'или API SPWorlds упал.\n\n'
+                                           'Проверить статус API можно тут -'
+                                           'https://uptime.deesiigneer.ru/status/spworlds', ephemeral=True)
+        elif update_resume_preview[1]:
             await interaction.edit(embed=update_resume_preview[0],
                                    view=ResumeEdit(interaction=interaction,
                                                    sql_recruiting=update_resume_preview[1]))
-        else:
-            # TODO: express installation
-            await interaction.send(content='no resume_fields in database', ephemeral=True)
         # await interaction.response.send_modal(RecruitingModal(guild=interaction.guild))
         # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
 
@@ -310,9 +313,16 @@ class ResumeEdit(View):
             self.sql_resume = sql.get_resume_fields_order_by_row(interaction.guild.id)
         from handler import update_resume_preview
         update_resume_preview = await update_resume_preview(interaction)
-        await interaction.edit(embed=update_resume_preview[0],
-                               view=ResumeEdit(self.interaction, self.sql_resume,
-                                               disable_delete=True))
+        if update_resume_preview == [None, None]:
+            # TODO: express installation
+            await interaction.send(content='Извини дружище, видимо у тебя нет проходки на СПм '
+                                           'или API SPWorlds упал.\n\n'
+                                           'Проверить статус API можно тут -'
+                                           'https://uptime.deesiigneer.ru/status/spworlds', ephemeral=True)
+        else:
+            await interaction.edit(embed=update_resume_preview[0],
+                                   view=ResumeEdit(self.interaction, self.sql_resume,
+                                                   disable_delete=True))
 
     @button(label='Предпросмотр', style=ButtonStyle.blurple, row=2, custom_id='preview_resume')
     async def preview_resume(self, button: Button, interaction: Interaction):
@@ -368,14 +378,28 @@ class ResumeSelect(Select):
                             ResumeModalConstructor(field[1], field[5], self.sql_resume_fields))
                         from handler import update_resume_preview
                         update_resume_preview = await update_resume_preview(interaction)
-                        await interaction.edit_original_message(embed=update_resume_preview[0],
-                                                                view=ResumeEdit(interaction, update_resume_preview[1]))
+                        if update_resume_preview == [None, None]:
+                            # TODO: express installation
+                            await interaction.send(content='Извини дружище, видимо у тебя нет проходки на СПм '
+                                                           'или API SPWorlds упал.\n\n'
+                                                           'Проверить статус API можно тут -'
+                                                           'https://uptime.deesiigneer.ru/status/spworlds', ephemeral=True)
+                        else:
+                            await interaction.edit_original_message(embed=update_resume_preview[0],
+                                                                    view=ResumeEdit(interaction, update_resume_preview[1]))
         elif self.do is not None and self.do is False:  # delete
             sql.delete_resume_field(interaction.guild.id, int(self.values[0]))
             from handler import update_resume_preview
             update_resume_preview = await update_resume_preview(interaction)
-            await interaction.edit(embed=update_resume_preview[0],
-                                   view=ResumeEdit(interaction, update_resume_preview[1]))
+            if update_resume_preview == [None, None]:
+                # TODO: express installation
+                await interaction.send(content='Извини дружище, видимо у тебя нет проходки на СПм '
+                                               'или API SPWorlds упал.\n\n'
+                                               'Проверить статус API можно тут -'
+                                               'https://uptime.deesiigneer.ru/status/spworlds', ephemeral=True)
+            else:
+                await interaction.edit(embed=update_resume_preview[0],
+                                       view=ResumeEdit(interaction, update_resume_preview[1]))
 
 
 class ResumeModalConstructor(Modal):
@@ -445,8 +469,15 @@ class ResumeModalConstructor(Modal):
                                         field_row=self.row)
         from handler import update_resume_preview
         update_resume_preview = await update_resume_preview(interaction)
-        await interaction.edit(embed=update_resume_preview[0],
-                               view=ResumeEdit(interaction, self.sql_resume_fields))
+        if update_resume_preview == [None, None]:
+            # TODO: express installation
+            await interaction.send(content='Извини дружище, видимо у тебя нет проходки на СПм '
+                                           'или API SPWorlds упал.\n\n'
+                                           'Проверить статус API можно тут -'
+                                           'https://uptime.deesiigneer.ru/status/spworlds', ephemeral=True)
+        else:
+            await interaction.edit(embed=update_resume_preview[0],
+                                   view=ResumeEdit(interaction, self.sql_resume_fields))
 
 
 class RecruitingModal(Modal):
@@ -484,8 +515,15 @@ class RecruitingModal(Modal):
             for label in self.labels:
                 preview_labels.append(label.value)
             update_resume_preview = await update_resume_preview(interaction, preview_labels=preview_labels)
-            await self.interaction.edit_original_message(embed=update_resume_preview[0],
-                                        view=ResumeEdit(interaction, update_resume_preview[1])) if self.interaction is not None else None
+            if update_resume_preview == [None, None]:
+                # TODO: express installation
+                await interaction.send(content='Извини дружище, видимо у тебя нет проходки на СПм '
+                                               'или API SPWorlds упал.\n\n'
+                                               'Проверить статус API можно тут -'
+                                               'https://uptime.deesiigneer.ru/status/spworlds', ephemeral=True)
+            else:
+                await self.interaction.edit_original_message(embed=update_resume_preview[0],
+                                            view=ResumeEdit(interaction, update_resume_preview[1])) if self.interaction is not None else None
         elif self.preview is False:
             sql_recruiting = sql.get_recruiting(interaction.guild.id)
             channel = interaction.guild.get_channel(sql_recruiting[2])
@@ -494,15 +532,22 @@ class RecruitingModal(Modal):
             for label in self.labels:
                 preview_labels.append(label.value)
             update_resume_preview = await update_resume_preview(interaction, preview_labels, channel)
-            message = await channel.send(embed=update_resume_preview[0])
-            await message.add_reaction(interaction.client.get_emoji(1102183935762497546))
-            await message.add_reaction(interaction.client.get_emoji(1102183934101553222))
-            thread = await interaction.channel.create_thread(name=f'Заявка-{interaction.user.display_name}',
-                                                    type=ChannelType.private_thread)
-            await thread.send(embed=update_resume_preview[0])
-            await thread.add_user(interaction.user)
-            await thread.send(f'{interaction.user.mention}, ваша заявка была отправлена! '
-                              f'Ожидайте её рассмотрения.', ephemeral=True)
+            if update_resume_preview == [None, None]:
+                # TODO: express installation
+                await interaction.send(content='Извини дружище, видимо у тебя нет проходки на СПм '
+                                               'или API SPWorlds упал.\n\n'
+                                               'Проверить статус API можно тут -'
+                                               'https://uptime.deesiigneer.ru/status/spworlds', ephemeral=True)
+            else:
+                message = await channel.send(embed=update_resume_preview[0])
+                await message.add_reaction(interaction.client.get_emoji(1102183935762497546))
+                await message.add_reaction(interaction.client.get_emoji(1102183934101553222))
+                thread = await interaction.channel.create_thread(name=f'Заявка-{interaction.user.display_name}',
+                                                        type=ChannelType.private_thread)
+                await thread.send(embed=update_resume_preview[0])
+                await thread.add_user(interaction.user)
+                await thread.send(f'{interaction.user.mention}, ваша заявка была отправлена! '
+                                  f'Ожидайте её рассмотрения.')
 
 
 # class application_to_city_modal2(Modal):
