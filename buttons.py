@@ -81,7 +81,7 @@ class CreateReqruiting(View):
     # async def extended_installation(self, button: Button, interaction: Interaction):
         # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
 
-    @button(label='Установка модуля', style=ButtonStyle.blurple, row=1, custom_id='simplified_installation')
+    @button(label='Установка модуля [Заявки в город]', style=ButtonStyle.blurple, row=1, custom_id='simplified_installation')
     async def simplified_installation(self, button: Button, interaction: Interaction):
         # button.disabled = True
         # self.extended_installation.disabled = True

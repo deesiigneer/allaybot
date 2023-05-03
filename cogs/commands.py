@@ -71,6 +71,9 @@ class GeneralCommands(commands.Cog):
             await update_panel(interaction.client, interaction.guild)
             await interaction.send(f'{channel.mention} был установлен как канал в котором будут появляться заявки.',
                                    ephemeral=True)
+        else:
+            await interaction.send(f'Модуль заявок в город не установлен. Установите его через панель.',
+                                   ephemeral=True)
 
     @slash_command(description='for bot owner only.', guild_ids=[850091193190973472])
     @application_checks.is_owner()
@@ -101,7 +104,7 @@ class GeneralCommands(commands.Cog):
         guilds = interaction.client.guilds
         await interaction.send(f'{[guild for guild in guilds]}')
 
-    @slash_command(description="EDIT ABOUT")
+    @slash_command(description="редактирует сообщение в канале с кнопкой")
     @application_checks.has_permissions(administrator=True)
     async def recruiting(self,
                          interaction: Interaction,

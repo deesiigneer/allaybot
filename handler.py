@@ -155,9 +155,11 @@ async def update_applications_panel(bot: commands.Bot, guild: Guild):
     disabled_emoji: Emoji = bot.get_emoji(1038421382477922384)
     enabled_emoji: Emoji = bot.get_emoji(1038421381085401088)
     embed = Embed(title=f'Настройка заявок в город `{guild.name}` {enabled_emoji if status else disabled_emoji}',
-                  description=f'**Используйте команду** *`/recruiting`* - для редактирования канала '
-                              f'с описанием города и кнопкой\n\n'
-                              f'**Используйте команду** *`/resume`* - для редактирования канала с заявками в город\n\n',
+                  description=f'**Используйте команду** *`/recruiting`* - для редактирования текста в канала '
+                              f'с описанием города и кнопкой\n'
+                              f'||Можете воспользоваться созданием файла вебхука [тут](https://discohook.org/)||\n\n'
+                              f'**Используйте команду** *`/resume`* - для редактирования изменения с заявками '
+                              f'в город\n\n',
                   color=0x2f3136)
     embed.add_field(name='Канал с описанием города.',
                     value=f'{recruiting_channel.mention if recruiting_channel is not None else "*Не установлен*"}\n'
