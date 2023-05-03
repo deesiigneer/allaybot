@@ -169,13 +169,13 @@ async def update_applications_panel(bot: commands.Bot, guild: Guild):
 
 
 async def update_resume_preview(interaction: Interaction, preview_labels: list = None, channel: TextChannel = None):
+    sql_user = sql.get_user(interaction.user.id)
     spapi = SPAPI('6273cba5-add3-44b8-a9a6-d528fcf0f29a', 'hQvWsc9FssggbtNXukG/3XbgNXtyTgos')
     sp_user = spapi.get_user(interaction.user.id)
-    if sp_user is not None:
+    if sql_user is None and sp_user is not None:
         sql.add_user(interaction.user.id, MojangAPI().get_uuid(sp_user.username))
     else:
         return [None, None]
-    sql_user = sql.get_user(interaction.user.id)
     # TODO: проверка на никнейм by pyspapi
     embed = Embed(title=f'Заявка №{len(await channel.history().flatten()) if channel is not None else "ПРЕДПРОСМОТР"}',
                   description=f'От - {interaction.user.mention}',
