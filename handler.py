@@ -175,7 +175,6 @@ async def update_resume_preview(interaction: Interaction, preview_labels: list =
     sql_user = sql.get_user(interaction.user.id)
     spapi = SPAPI('6273cba5-add3-44b8-a9a6-d528fcf0f29a', 'hQvWsc9FssggbtNXukG/3XbgNXtyTgos')
     sp_user = spapi.get_user(interaction.user.id)
-    print('username',sp_user.username)
     if sql_user is None and sp_user is not None:
         sql.add_user(interaction.user.id, MojangAPI().get_uuid(sp_user.username))
     elif sql_user is None and sp_user is None:
