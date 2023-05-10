@@ -1,5 +1,5 @@
 import nextcord
-from nextcord.ui import View, Select, Modal, Button, button, TextInput
+from nextcord.ui import View, Select, Modal, Button, button, TextInput, Item
 from nextcord.utils import find
 from nextcord import ButtonStyle, Interaction, Embed, Role, Emoji, PermissionOverwrite, Guild, SelectOption, \
     TextChannel, TextInputStyle, ChannelType
@@ -44,7 +44,7 @@ class BotPanelButtons(View):
         else:
             await interaction.send(content=f'Модуль `Набор в город` для `{interaction.guild.name}` ещё не установлены',
                                    embeds=embeds,
-                                   view=CreateReqruiting(interaction),
+                                   view=CreateRecruiting(interaction),
                                    ephemeral=True)
         # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
 
@@ -61,13 +61,13 @@ class BotPanelButtons(View):
             await Check(interaction.client, interaction.guild).comparison_database_to_guild(interaction, channel,
                                                                                             interaction.message)
             await update_panel(interaction.client, interaction.guild)
-            await  interaction.message.edit(view=BotPanelButtons())
+            await interaction.message.edit(view=BotPanelButtons())
             # await interaction.edit(embeds=embeds, view=BotPanelButtons())
         except Exception as e:
             raise f"Update Exception {e}"
 
 
-class CreateReqruiting(View):
+class CreateRecruiting(View):
 
     def __init__(self, interaction: Interaction = None):
         super().__init__(timeout=None)

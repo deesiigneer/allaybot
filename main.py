@@ -25,11 +25,11 @@ class Bot(commands.Bot):
     async def on_ready(self):
         if not self.persistent_views_added:
             self.persistent_views_added = True
-            from buttons import ButtonRecruiting, BotPanelButtons, CreateReqruiting, \
+            from buttons import ButtonRecruiting, BotPanelButtons, CreateRecruiting, \
                 ApplicationToCityButtons, ResumeEdit
             self.add_view(ButtonRecruiting())
             self.add_view(BotPanelButtons())
-            self.add_view(CreateReqruiting())
+            self.add_view(CreateRecruiting())
             # self.add_view(ExtendedInstallation())
             self.add_view(ApplicationToCityButtons())
             self.add_view(ResumeEdit())
@@ -86,7 +86,11 @@ class Bot(commands.Bot):
                                      citizen_role.id if citizen_role is not None else None)
                 elif panel_channel is None:
                     if guild_bot.guild_permissions.manage_channels:
-                        overwrites = {guild.get_member(self.user.id): nextcord.PermissionOverwrite(send_messages=True)}
+                        overwrites = {
+                            guild.get_member(self.user.id): nextcord.PermissionOverwrite(view_channel=True,
+                                                                                         send_messages=True),
+                            guild.default_role: nextcord.PermissionOverwrite(view_channel=False)
+                        }
                         panel_channel = await guild.create_text_channel(name=f'🤖ㆍ{self.user.display_name}-panel',
                                                                         overwrites=overwrites)
                         from handler import update_panel

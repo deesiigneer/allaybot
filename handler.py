@@ -1,5 +1,5 @@
 from nextcord.ext import commands
-from nextcord import Guild, TextChannel, Role, Emoji, Embed, Interaction, PartialMessage, Message
+from nextcord import Guild, TextChannel, Role, Emoji, Embed, Interaction, PartialMessage, Message, Permissions
 from database import sql
 from pyspapi import SPAPI, MojangAPI
 
@@ -17,6 +17,37 @@ class Check:
         self.guild = guild
         self.__log_guild = bot.get_guild(850091193190973472)
         self.log_channel = self.__log_guild.get_channel(1103024684003508274)
+
+    async def channel_permissions(self, channel: TextChannel):
+        guild = self.guild
+        bot = self.bot
+        return channel.permissions_for(guild.get_member(bot.user.id))
+
+    async def permissions(self, permsission: Permissions):
+        guild = self.guild
+        bot = self.bot
+        permissions = guild.get_member(bot.user.id).guild_permissions
+
+    async def channels_exist(self):
+        guild = self.guild
+        bot = self.bot
+        sql_guild = sql.get_guild(guild.id)
+        sql_recruiting = sql.get_recruiting(guild.id)
+        if sql_guild is not None:
+            perms: Permissions = guild.get_member(bot.user.id).guild_permissions
+            if perms.manage_channels and perms.send_messages:
+                panel_channel_id = sql_guild[1]
+                panel_message_id = sql_guild[3]
+                citizen_role_id = sql_guild[2]
+                panel_channel = guild.get_channel(panel_channel_id)
+                if panel_channel is not None:
+                    panel_message = panel_channel.get_partial_message(panel_message_id)
+            # else:
+
+            # else:
+            #
+            # citizen_role_id = guild.get_role(citizen_role_id)
+
 
     async def comparison_database_to_guild(self, interaction: Interaction,
                                            channel: TextChannel = None, message: Message = None):
