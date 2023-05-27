@@ -192,6 +192,24 @@ class Database(object):
         return self.connection.commit()
 
     @retry
+    def delete_guild(self, guild_id: int):
+        self.cur.execute("""
+        DELETE FROM guilds 
+        WHERE guild_id = %s
+        """,
+                         [guild_id])
+        return self.connection.commit()
+
+    @retry
+    def delete_recruiting(self, guild_id: int):
+        self.cur.execute("""
+        DELETE FROM recruitings 
+        WHERE guild_id = %s
+        """,
+                         [guild_id])
+        return self.connection.commit()
+
+    @retry
     def delete_resume_field(self, guild_id: int, row: int):
         self.cur.execute("""
         DELETE FROM resume_fields 

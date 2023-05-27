@@ -59,6 +59,8 @@ class Bot(commands.Bot):
     async def on_guild_remove(self, guild: nextcord.Guild):
         log_guild = self.get_guild(850091193190973472)
         log_channel = log_guild.get_channel(1103024684003508274)
+        sql.delete_guild(guild.id)
+        sql.delete_recruiting(guild.id)
         await log_channel.send(f'Удален из guild: {guild.name} ({guild.id})')
 
     async def on_guild_join(self, guild: nextcord.Guild):
@@ -89,9 +91,9 @@ class Bot(commands.Bot):
                         overwrites = {
                             guild.get_member(self.user.id): nextcord.PermissionOverwrite(view_channel=True,
                                                                                          send_messages=True),
-                            guild.default_role: nextcord.PermissionOverwrite(view_channel=False)
+                            guild.default_role: nextcord.PermissionOverwrite(read_messages=False)
                         }
-                        panel_channel = await guild.create_text_channel(name=f'🤖ㆍ{self.user.display_name}-panel',
+                        panel_channel = await guild.create_text_channel(name=f'🤖ㆍabc-{self.user.display_name}-panel',
                                                                         overwrites=overwrites)
                         from handler import update_panel
                         sql.update_guild(guild.id,
@@ -102,8 +104,12 @@ class Bot(commands.Bot):
                         await update_panel(self, guild)
             else:
                 # try:
-                overwrites = {guild.get_member(self.user.id): nextcord.PermissionOverwrite(send_messages=True)}
                 if guild_bot.guild_permissions.manage_channels:
+                    overwrites = {
+                        guild.get_member(self.user.id): nextcord.PermissionOverwrite(view_channel=True,
+                                                                                     send_messages=True),
+                        guild.default_role: nextcord.PermissionOverwrite(read_messages=False)
+                    }
                     panel_channel = await guild.create_text_channel(name=f'🤖ㆍ{self.user.display_name}-panel',
                                                                     overwrites=overwrites)
                     sql.add_guild(guild_id=guild.id,
