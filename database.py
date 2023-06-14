@@ -72,7 +72,7 @@ class Database(object):
     @retry
     def get_guilds(self):
         self.cur.execute("""
-        SELECT guild_id FROM guilds """, )
+        SELECT * FROM guilds """, )
         return self.cur.fetchall()
 
     @retry
@@ -86,6 +86,13 @@ class Database(object):
     def get_resume_fields_order_by_row(self, guild_id: int):
         self.cur.execute("""
         SELECT * FROM resume_fields WHERE guild_id = '%s' ORDER BY field_row""",
+                         [guild_id])
+        return self.cur.fetchall()
+
+    @retry
+    def get_tasks(self, guild_id: int):
+        self.cur.execute("""
+        SELECT * FROM tasks WHERE guild_id = '%s'""",
                          [guild_id])
         return self.cur.fetchall()
 

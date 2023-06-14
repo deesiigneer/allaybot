@@ -10,7 +10,7 @@ import buttons
 from database import sql
 from handler import update_panel
 
-guilds = sql.get_guilds()
+guilds = sql.get_guilds()[0]
 
 
 class GeneralCommands(commands.Cog):
@@ -102,7 +102,16 @@ class GeneralCommands(commands.Cog):
     @application_checks.is_owner()
     async def guilds(self, interaction: Interaction):
         guilds = interaction.client.guilds
-        await interaction.send(f'{[guild for guild in guilds]}')
+        message = ''
+        for guild in guilds:
+            invites = ''
+            for invite in await guild.invites():
+                if invites is None:
+                    invites = 'None'
+                else:
+                    invites += (f'https://discord.gg/{invite.code}\n')
+            message += f'`{guild.name}` ({guild.id}) \n||{invites}||\n\n'
+        await interaction.send(message, suppress_embeds=True,ephemeral=True)
 
     @slash_command(description="редактирует сообщение в канале с кнопкой")
     @application_checks.has_permissions(administrator=True)

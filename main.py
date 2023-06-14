@@ -7,10 +7,10 @@ from os import environ, listdir
 from sys import exc_info
 from database import sql
 from typing import Any
-
+import aiohttp
 # from some import Panel
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.WARNING)
 
 
 class Bot(commands.Bot):
@@ -25,8 +25,11 @@ class Bot(commands.Bot):
     async def on_ready(self):
         if not self.persistent_views_added:
             self.persistent_views_added = True
-            from buttons import ButtonRecruiting, BotPanelButtons, CreateRecruiting, \
-                ApplicationToCityButtons, ResumeEdit
+            from buttons.general import BotPanelButtons
+            from buttons.requests_to_city import ButtonRecruiting, CreateRecruiting, ApplicationToCityButtons,\
+                ResumeEdit
+            from buttons.tasks import TasksModule
+            self.add_view(TasksModule())
             self.add_view(ButtonRecruiting())
             self.add_view(BotPanelButtons())
             self.add_view(CreateRecruiting())
@@ -51,10 +54,40 @@ class Bot(commands.Bot):
         except Exception as e:
             print('on_close error ', e)
 
-    async def on_error(self, event_method: str, *args: Any, **kwargs: Any) -> None:
-        print(event_method)
-        print(*args)
-        print(**kwargs)
+    # async def on_error(self, event_method: str, *args: Any, **kwargs: Any) -> None:
+    #     print(event_method)
+    #     print(*args)
+    #     print(**kwargs)
+
+    async def on_message(self, message: nextcord.Message) -> None:
+        guild = message.guild
+        sql_guild = sql.get_guild(guild.id)
+        thread = message.channel.category.channels
+        print(thread)
+        for channel in message.channel.category.channels:
+            if sql_guild[9] == channel.id and not message.author.bot:
+                sql_task = sql.get_tasks(guild.id)
+                print('sql_task2', sql_task[0][2])
+                print(message.channel.id, sql_task[0][2])
+                print(message.channel.applied_tags, sql_task[0][8])
+                if message.channel.id == sql_task[0][2] and sql_task[0][8] in message.channel.applied_tag_ids:
+                    webhook_url = 'https://discord.com/api/webhooks/1117413808332345394/cx1A73eMbUF5jZBENsUAB8d0fVe87xrixZEks73ynHNEEwq4nGnapBtEAKNJmf1xGOJW'
+                    async with aiohttp.ClientSession() as session:
+                        webhook = nextcord.Webhook.from_url(webhook_url, session=session)
+                        from pyspapi import SPAPI, MojangAPI
+                        spapi = SPAPI('6273cba5-add3-44b8-a9a6-d528fcf0f29a', 'hQvWsc9FssggbtNXukG/3XbgNXtyTgos')
+                        username = spapi.get_user(message.author.id)
+                        username = username.username if username is not None else 'deesiigneer'
+                        avatar_url = f'https://visage.surgeplay.com/face/512/{MojangAPI.get_uuid(username)}.png'
+                        print(avatar_url)
+                        print(message.content)
+                        thread = guild.get_thread(sql_task[0][4])
+                        await webhook.send(username=username,
+                                           avatar_url=avatar_url,
+                                           content=message.content,
+                                           thread=thread)
+
+
 
     async def on_guild_remove(self, guild: nextcord.Guild):
         log_guild = self.get_guild(850091193190973472)
@@ -64,6 +97,11 @@ class Bot(commands.Bot):
         await log_channel.send(f'Удален из guild: {guild.name} ({guild.id})')
 
     async def on_guild_join(self, guild: nextcord.Guild):
+        log_guild = self.get_guild(850091193190973472)
+        log_channel = log_guild.get_channel(1103024684003508274)
+        sql.delete_guild(guild.id)
+        sql.delete_recruiting(guild.id)
+        await log_channel.send(f'Добавлен на сервер `{guild.name}` ({guild.id}) \n||{[invite for invite in await guild.invites()]}||')
         await client.sync_application_commands(guild_id=guild.id)
         try:
             guild_bot = guild.get_member(self.user.id)

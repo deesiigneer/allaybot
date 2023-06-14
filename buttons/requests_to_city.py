@@ -26,47 +26,6 @@ class ButtonRecruiting(View):
                                                               interaction=interaction))
 
 
-class BotPanelButtons(View):
-
-    def __init__(self):
-        super().__init__(timeout=None)
-
-    @button(label='Набор в город', emoji='👋', style=ButtonStyle.blurple, row=1, custom_id='application_to_city')
-    async def application_to_city(self, button: Button, interaction: Interaction):
-        from handler import update_applications_panel
-        sql_recruiting = sql.get_recruiting(interaction.guild.id)
-        embeds = [await update_applications_panel(interaction.client, interaction.guild)]
-        if sql_recruiting:
-            await interaction.response.send_message(embeds=embeds,
-                                                    view=ApplicationToCityButtons(interaction=interaction),
-                                                    ephemeral=True)
-            #  TODO
-        else:
-            await interaction.send(content=f'Модуль `Набор в город` для `{interaction.guild.name}` ещё не установлены',
-                                   embeds=embeds,
-                                   view=CreateRecruiting(interaction),
-                                   ephemeral=True)
-        # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
-
-    @button(label='[in dev] Список жителей', disabled=True, emoji='👷', style=ButtonStyle.blurple, row=1,
-            custom_id='citizens')
-    async def citizens(self, interaction: Interaction):
-        pass
-
-    @button(label='Обновить', emoji='🔃', style=ButtonStyle.blurple, row=2, custom_id='settings_panel_update')
-    async def update(self, button: Button, interaction: Interaction):
-        try:
-            from handler import update_panel, Check
-            channel = interaction.guild.get_channel(interaction.channel.id)
-            await Check(interaction.client, interaction.guild).comparison_database_to_guild(interaction, channel,
-                                                                                            interaction.message)
-            await update_panel(interaction.client, interaction.guild)
-            await interaction.message.edit(view=BotPanelButtons())
-            # await interaction.edit(embeds=embeds, view=BotPanelButtons())
-        except Exception as e:
-            raise f"Update Exception {e}"
-
-
 class CreateRecruiting(View):
 
     def __init__(self, interaction: Interaction = None):
@@ -75,18 +34,13 @@ class CreateRecruiting(View):
         self.sql_recruiting = None
         if self.interaction is not None:
             self.sql_recruiting = sql.get_recruiting(self.interaction.guild.id)
-        # self.add_item(ExtendedInstallationSelect())
-
-    # @button(label='Расширенная установка', style=ButtonStyle.blurple, row=1, custom_id='extended_installation')
-    # async def extended_installation(self, button: Button, interaction: Interaction):
-        # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
 
     @button(label='Установка модуля [Заявки в город]', style=ButtonStyle.blurple, row=1, custom_id='simplified_installation')
-    async def simplified_installation(self, button: Button, interaction: Interaction):
+    async def simplified_installation(self, btn: Button, interaction: Interaction):
         # button.disabled = True
         # self.extended_installation.disabled = True
         # await interaction.edit(view=self)
-        button.disabled = True
+        btn.disabled = True
         # self.extended_installation.disabled = True
         await interaction.edit(view=self)
         sql_guild = sql.get_guild(interaction.guild.id)
@@ -139,24 +93,6 @@ class CreateRecruiting(View):
                                        f'Что бы установить используйте `/citizen`',
                                        ephemeral=True)
 
-
-# class ExtendedInstallation(View):
-#
-#     def __init__(self, interaction: Interaction = None):
-#         super().__init__(timeout=None)
-#         self.interaction = interaction if interaction is not None else None
-#
-#     @button(label='Сохранить', style=ButtonStyle.green, row=1, custom_id='extended_installation')
-#     async def extended_installation(self, button: Button, interaction: Interaction):
-#         await self.interaction.edit_original_message(view=self.interaction)
-#         self.stop()
-#         # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
-#
-#     @button(label='Назад', style=ButtonStyle.blurple, row=1, custom_id='simplified_installation')
-#     async def simplified_installation(self, button: Button, interaction: Interaction):
-#         await self.interaction.edit_original_message(view=CreateReqruiting(self.interaction))
-        # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
-        # await interaction.response.send_modal(application_to_city_modal(guild=interaction.guild))
 
 
 class ExtendedInstallationSelect(Select):
@@ -417,8 +353,8 @@ class ResumeModalConstructor(Modal):
             title = f'{title[:42]}...'
         super().__init__(title=title, timeout=None)
         self.name = TextInput(
-            label='Имя',
-            placeholder='Имя поля (Как текст выше)',
+            label='Название поля',
+            placeholder='Введите название создаваемого поля',
             style=TextInputStyle.paragraph,
             custom_id='ResumeModalConstructor_name',
             min_length=1,
@@ -426,8 +362,8 @@ class ResumeModalConstructor(Modal):
             required=True)
         self.add_item(self.name)
         self.placeholder = TextInput(
-            label='Заполнитель',
-            placeholder='Заполняет поле если пустое (как сейчас).\nМожно оставить пустым',
+            label='Плейсхолдер поля',
+            placeholder='Введите текст подсказки, который будет находиться внутри поля',
             style=TextInputStyle.paragraph,
             custom_id='ResumeModalConstructor_placeholder',
             min_length=0,
@@ -435,9 +371,9 @@ class ResumeModalConstructor(Modal):
             required=False)
         self.add_item(self.placeholder)
         self.style = TextInput(
-            label='Стиль',
-            placeholder='Если оставить пустым, будет как поле ниже.\n'
-                        'Можете написать тут, что бы стиль был как это поле.',
+            label='Отображать как многострочное поле <textarea>',
+            placeholder='Введите любой символ для применения возможности ввода '
+                        'нескольких строк текста в создаваемое поле',
             style=TextInputStyle.paragraph,
             custom_id='ResumeModalConstructor_style',
             min_length=0,
@@ -445,10 +381,9 @@ class ResumeModalConstructor(Modal):
             required=False)
         self.add_item(self.style)
         self.requierd = TextInput(
-            label='Обязателен?',
-            placeholder='Если оставить пустым, будет необязательным.\n'
-                        'Или написать что-то, что бы стало обязательным.',
-            style=TextInputStyle.short,
+            label='Обязательность поля',
+            placeholder='Введите любой символ, если поле должно быть обязательным',
+            style=TextInputStyle.paragraph,
             custom_id='ResumeModalConstructor_required',
             min_length=0,
             max_length=1,

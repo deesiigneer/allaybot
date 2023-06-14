@@ -112,6 +112,7 @@ async def update_panel(bot: commands.Bot, guild: Guild) -> None:
         citizen_role = None
         sql_guild: list = sql.get_guild(guild.id)
         sql_recruiting: list = sql.get_recruiting(guild.id)
+        print(f'updatepanel {sql_guild}')
         if sql_guild:
             panel_channel = guild.get_channel(sql_guild[1]) if sql_guild[1] is not None else None
             citizen_role = guild.get_role(sql_guild[2]) if sql_guild[2] is not None else None
@@ -144,30 +145,31 @@ async def update_panel(bot: commands.Bot, guild: Guild) -> None:
                   f'{resume_channel.mention if resume_channel is not None else ""} ',
             inline=False)
 
-        if citlist_channel is None:
-            emoji: Emoji = bot.get_emoji(1038421382477922384)
-        else:
-            emoji: Emoji = bot.get_emoji(1038421381085401088)
-        embed.add_field(name=f'Список жителей города {guild.name} {emoji}',
-                        value=citlist_channel.mention if citlist_channel is not None else '*Не установлено*',
-                        inline=False)
+        # if citlist_channel is None:
+        #     emoji: Emoji = bot.get_emoji(1038421382477922384)
+        # elif citlist_channel is not None:
+        #     emoji: Emoji = bot.get_emoji(1038421381085401088)
+        # embed.add_field(name=f'Список жителей города {guild.name} {emoji}',
+        #                 value=citlist_channel.mention if citlist_channel is not None else '*Не установлено*',
+        #                 inline=False)
         embeds = [embed]
         msg = None
         #  TODO: rewrite msg
-        async for message in panel_channel.history(limit=100, oldest_first=True):
-            if message.author == bot.user:
-                from buttons import BotPanelButtons
-                msg = await message.edit(embeds=embeds, view=BotPanelButtons())
-        if msg is None:
-            from buttons import BotPanelButtons
-            msg = await panel_channel.send(embeds=embeds, view=BotPanelButtons())
-        sql.update_guild(
-            guild.id,
-            panel_channel.id if panel_channel is not None else None,
-            msg.id if msg is not None else None,
-            citizen_role.id if citizen_role is not None else None,
+        if panel_channel is not None:
+            async for message in panel_channel.history(limit=100, oldest_first=True):
+                if message.author == bot.user:
+                    from buttons.general import BotPanelButtons
+                    msg = await message.edit(embeds=embeds, view=BotPanelButtons())
+            if msg is None:
+                from buttons.general import BotPanelButtons
+                msg = await panel_channel.send(embeds=embeds, view=BotPanelButtons())
+            sql.update_guild(
+                guild.id,
+                panel_channel.id if panel_channel is not None else None,
+                msg.id if msg is not None else None,
+                citizen_role.id if citizen_role is not None else None,
 
-        )
+            )
         return
     except PermissionError as e:
         raise f"Don`t enough permission for send message to system channel! {e}"
@@ -179,6 +181,7 @@ async def update_applications_panel(bot: commands.Bot, guild: Guild):
     status = False
     recruiting_message = None
     sql_recruiting: list = sql.get_recruiting(guild.id)
+    await Check(bot, guild).channels_exist()
     if sql_recruiting is not None:
         recruiting_channel = guild.get_channel(sql_recruiting[1])
         resume_channel = guild.get_channel(sql_recruiting[2])
