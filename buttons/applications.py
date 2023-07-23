@@ -15,8 +15,8 @@ class ButtonRecruiting(View):
         self.recruiting_to_city.disabled = True
         print('ButtonRecruiting1', sql_recruiting)
         if sql_recruiting:
-            print('ButtonRecruiting2', sql_recruiting[3])
-            if sql_recruiting[3] is True:
+            print('ButtonRecruiting2', sql_recruiting['status'])
+            if sql_recruiting['status'] is True:
                 self.recruiting_to_city.disabled = False
 
     @button(label='Оставить заявку', emoji='👋', style=ButtonStyle.green, row=1, custom_id='recruiting_to_city')
@@ -45,7 +45,7 @@ class CreateRecruiting(View):
         await interaction.edit(view=self)
         sql_guild = sql.get_guild(interaction.guild.id)
         if sql_guild:
-            if sql_guild[2] is not None:
+            if sql_guild['citizen_role_id'] is not None:
                 embed = Embed(title=f'Набор в город {interaction.guild.name}!',
                               description=f'Нажмите кнопку ниже и заполните форму, для подачи заявки в замечательный '
                                           f'город **{interaction.guild.name}**!',
@@ -59,7 +59,7 @@ class CreateRecruiting(View):
                 embed.set_author(name=f'powered by {interaction.client.user.name}',
                                  icon_url=interaction.client.user.avatar.url,
                                  url='https://discord.gg/VbyHaKRAaN')
-                citizen = interaction.guild.get_role(sql_guild[2])
+                citizen = interaction.guild.get_role(sql_guild['citizen_role_id'])
                 application_to_city_category = await interaction.guild.create_category('👷Набор в город')
                 recruiting_channel = await application_to_city_category.create_text_channel(
                     name='👋ㆍнабор-в-город',
@@ -83,16 +83,21 @@ class CreateRecruiting(View):
                 if not sql_resume:
                     sql.add_resume_field(interaction.guild.id, 'nickname', 'deesiigneer', False, True, 0)
                 await recruiting_message.edit(view=ButtonRecruiting(interaction.guild))
+                invite = await recruiting_channel.create_invite()
+                print(invite.code)
+                sql.update_invite(guild_id=interaction.guild.id, invite=invite.code)
                 await interaction.send(f'Были созданы каналы:\n'
                                        f'{recruiting_channel.mention} - о городе, где находится кнопка для подачи '
                                        f'заявки в город {interaction.guild.name}\n'
                                        f'{resume_channel.mention} - где будут собираться заявки\n\n'
-                                       f'Нажмите кнопку "👋 Набор в город", что бы продолжить редактирование.', ephemeral=True)
+                                       f'Была создана ссылка для приглашения ||{invite.url}||, пожалуйста '
+                                       f'не удаляйте её!\n'
+                                       f'Перейдите в "👋 Заявки в город", что бы продолжить редактирование.',
+                                       ephemeral=True)
             else:
                 await interaction.send(f'Роль жителя не установлена для города {interaction.guild.name}!\n\n'
                                        f'Что бы установить используйте `/citizen`',
                                        ephemeral=True)
-
 
 
 class ExtendedInstallationSelect(Select):
@@ -123,10 +128,10 @@ class ApplicationToCityButtons(View):
         self.interaction = interaction
         self.sql_recruiting = sql.get_recruiting(interaction.guild.id) if interaction is not None else None
         super().__init__(timeout=None)
-        if self.sql_recruiting is not None and self.sql_recruiting[3] is True:
+        if self.sql_recruiting is not None and self.sql_recruiting['status'] is True:
             self.recruiting_status.label = 'Остановить прием заявок'
             self.recruiting_status.style = ButtonStyle.red
-        elif self.sql_recruiting is not None and self.sql_recruiting[3] is False:
+        elif self.sql_recruiting is not None and self.sql_recruiting['status'] is False:
             self.recruiting_status.label = 'Начать прием заявок'
             self.recruiting_status.style = ButtonStyle.green
 
@@ -159,23 +164,23 @@ class ApplicationToCityButtons(View):
         if self.sql_recruiting is None:
             self.sql_recruiting = sql.get_recruiting(interaction.guild.id)
         sql.update_recruiting(guild_id=interaction.guild.id,
-                              recruiting_channel_id=self.sql_recruiting[1],
-                              recruiting_message_id=self.sql_recruiting[4],
-                              resume_channel_id=self.sql_recruiting[2],
-                              status=False if bool(self.sql_recruiting[3]) is True else True)
+                              recruiting_channel_id=self.sql_recruiting['recruiting_channel_id'],
+                              recruiting_message_id=self.sql_recruiting['recruiting_message_id'],
+                              resume_channel_id=self.sql_recruiting['resume_channel_id'],
+                              status=False if bool(self.sql_recruiting['status']) is True else True)
         from handler import update_panel, update_applications_panel
-        if self.sql_recruiting is not None and self.sql_recruiting[3] is True:
+        if self.sql_recruiting is not None and self.sql_recruiting['status'] is True:
             button.label = 'Остановить прием заявок'
             button.style = ButtonStyle.red
-        elif self.sql_recruiting is not None and self.sql_recruiting[3] is False:
+        elif self.sql_recruiting is not None and self.sql_recruiting['status'] is False:
             button.label = 'Начать прием заявок'
             button.style = ButtonStyle.green
+        message = interaction.guild.get_channel(self.sql_recruiting['recruiting_channel_id']).get_partial_message(self.sql_recruiting['recruiting_message_id'])
+        await message.edit(view=ButtonRecruiting(interaction.guild))
         await update_panel(interaction.client, interaction.guild)
         embed = await update_applications_panel(interaction.client, interaction.guild)
         await interaction.edit(view=ApplicationToCityButtons(interaction),
                                embed=embed)
-        message = interaction.guild.get_channel(self.sql_recruiting[1]).get_partial_message(self.sql_recruiting[4])
-        await message.edit(view=ButtonRecruiting(interaction.guild))
 
 
 class ResumeEdit(View):
@@ -222,7 +227,7 @@ class ResumeEdit(View):
                 rows = []
                 nums = [4, 3, 2, 1, 0]
                 for field in sql_resume_fields:
-                    rows.append(field[5])
+                    rows.append(field['field_row'])
                     for num in nums:
                         if num not in rows:
                             row = num
@@ -290,9 +295,9 @@ class ResumeSelect(Select):
         if sql_resume_fields is not None:
             for field in sql_resume_fields:
                 print(field)
-                select_options.append(SelectOption(label=str(field[1]),
-                                                   description=str(field[2]),
-                                                   value=str(field[5])))
+                select_options.append(SelectOption(label=str(field['field_name']),
+                                                   description=str(field['field_placeholder']),
+                                                   value=str(field['field_row'])))
         else:
             select_options.append(SelectOption(label='how do u see this?',
                                                value='hmm...'))
@@ -311,10 +316,10 @@ class ResumeSelect(Select):
         if self.do is not None and self.do is True:  # edit
             if self.sql_resume_fields is not None:
                 for field in self.sql_resume_fields:
-                    if int(field[5]) == int(self.values[0]):
+                    if int(field['field_row']) == int(self.values[0]):
                         print(3)
                         await interaction.response.send_modal(
-                            ResumeModalConstructor(field[1], field[5], self.sql_resume_fields))
+                            ResumeModalConstructor(field['field_name'], field['field_row'], self.sql_resume_fields))
                         from handler import update_resume_preview
                         update_resume_preview = await update_resume_preview(interaction)
                         if update_resume_preview == [None, None]:
@@ -435,18 +440,19 @@ class RecruitingModal(Modal):
         if self.sql_resume_fields is not None:
             self.labels = []
             for field in self.sql_resume_fields:
-                self.labels.append(TextInput(label=field[1],
-                                        placeholder=field[2],
+                self.labels.append(TextInput(label=field['field_name'],
+                                        placeholder=field['field_placeholder'],
                                         style=TextInputStyle.paragraph if bool(
-                                            field[3]) is True else TextInputStyle.short,
-                                        required=True if bool(field[4]) is True else False,
-                                        row=field[5],
-                                        custom_id=f'RecruitingModal_{field[1]}_{field[5]}',
+                                            field['field_style']) is True else TextInputStyle.short,
+                                        required=True if bool(field['field_required']) is True else False,
+                                        row=field['field_row'],
+                                        custom_id=f'RecruitingModal_{field["field_name"]}_{field["field_row"]}',
                                         max_length=1024))
             for label in self.labels:
                 self.add_item(label)
 
     async def callback(self, interaction: Interaction):
+        message = await interaction.send('Нужно подождать...', ephemeral=True)
         if self.preview is True:
             from handler import update_resume_preview
             preview_labels = []
@@ -455,16 +461,17 @@ class RecruitingModal(Modal):
             update_resume_preview = await update_resume_preview(interaction, preview_labels=preview_labels)
             if update_resume_preview == [None, None]:
                 # TODO: express installation
-                await interaction.send(content='Извини дружище, видимо у тебя нет проходки на СПм '
+                await message.edit(content='Извини дружище, видимо у тебя нет проходки на СПм '
                                                'или API SPWorlds упал.\n\n'
                                                'Проверить статус API можно тут -'
-                                               'https://uptime.deesiigneer.ru/status/spworlds', ephemeral=True)
+                                               'https://uptime.deesiigneer.ru/status/spworlds')
             else:
                 await self.interaction.edit_original_message(embed=update_resume_preview[0],
                                             view=ResumeEdit(interaction, update_resume_preview[1])) if self.interaction is not None else None
+                await message.delete()
         elif self.preview is False:
             sql_recruiting = sql.get_recruiting(interaction.guild.id)
-            channel = interaction.guild.get_channel(sql_recruiting[2])
+            channel = interaction.guild.get_channel(sql_recruiting['resume_channel_id'])
             from handler import update_resume_preview
             preview_labels = []
             for label in self.labels:
@@ -472,16 +479,16 @@ class RecruitingModal(Modal):
             update_resume_preview = await update_resume_preview(interaction, preview_labels, channel)
             if update_resume_preview == [None, None]:
                 # TODO: express installation
-                await interaction.send(content='Извини дружище, видимо у тебя нет проходки на СПм '
+                await message.edit(content='Извини дружище, видимо у тебя нет проходки на СПм '
                                                'или API SPWorlds упал.\n\n'
                                                'Проверить статус API можно тут -'
-                                               'https://uptime.deesiigneer.ru/status/spworlds', ephemeral=True)
+                                               'https://uptime.deesiigneer.ru/status/spworlds')
             else:
                 thread = await interaction.channel.create_thread(name=f'Заявка-{interaction.user.display_name}',
                                                         type=ChannelType.private_thread)
                 await thread.add_user(interaction.user)
-                await interaction.send(f'{interaction.user.mention}, ваша заявка была отправлена!\n'
-                                       f'Все действия по вашей заявке вы всегда можете посмотреть тут -> {thread.jump_url}', ephemeral=True)
+                await message.edit(f'{interaction.user.mention}, ваша заявка была отправлена!\n'
+                                       f'Все действия по вашей заявке вы всегда можете посмотреть тут -> {thread.jump_url}')
                 message = await channel.send(embed=update_resume_preview[0])
                 await message.add_reaction(interaction.client.get_emoji(1102183935762497546))
                 await message.add_reaction(interaction.client.get_emoji(1102183934101553222))

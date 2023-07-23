@@ -7,7 +7,7 @@ from nextcord.ext import commands
 from sys import exc_info
 
 from database import sql
-from buttons.requests_to_city import BotPanelButtons
+from buttons.applications import BotPanelButtons
 
 
 class Panel(commands.Cog):

@@ -27,7 +27,7 @@ class GeneralCommands(commands.Cog):
         try:
             sql_guild = sql.get_guild(interaction.guild.id)
             if sql_guild is not None:
-                if sql_guild[2] == role.id:
+                if sql_guild['citizen_role_id'] == role.id:
                     await interaction.send(
                         content=f'{role.mention} уже используется как роль жителя для города {interaction.guild.name}',
                         ephemeral=True)
@@ -60,8 +60,8 @@ class GeneralCommands(commands.Cog):
         sql_recruiting = sql.get_recruiting(interaction.guild.id)
         if sql_recruiting is not None:
             sql.update_recruiting(interaction.guild.id,
-                                  sql_recruiting[1],
-                                  sql_recruiting[4],
+                                  sql_recruiting['recruiting_channel_id'],
+                                  sql_recruiting['recruiting_message_id'],
                                   channel.id,
                                   False)
             if sql.get_resume_fields_order_by_row(interaction.guild.id) is []:
@@ -142,10 +142,10 @@ class GeneralCommands(commands.Cog):
                                                'url': 'https://discord.gg/VbyHaKRAaN'}
                         embeds.append(Embed.from_dict(embed))
                     if sql_recruiting:
-                        if sql_recruiting[1] is not None:
-                            channel = await interaction.guild.fetch_channel(sql_recruiting[1])
-                        if sql_recruiting[4] is not None:
-                            message = await channel.fetch_message(sql_recruiting[4])
+                        if sql_recruiting['recruiting_channel_id'] is not None:
+                            channel = await interaction.guild.fetch_channel(sql_recruiting['recruiting_channel_id'])
+                        if sql_recruiting['recruiting_message_id'] is not None:
+                            message = await channel.fetch_message(sql_recruiting['recruiting_message_id'])
                     print('message is ', message)
                     if sql_recruiting is None and message is None:
                         if data['content'] is not None:
@@ -158,7 +158,7 @@ class GeneralCommands(commands.Cog):
                         sql.add_recruiting(interaction.guild.id,
                                            message.channel.id,
                                            message.id,
-                                           sql_recruiting[2] if sql_recruiting is not None else None,
+                                           sql_recruiting['resume_channel_id'] if sql_recruiting is not None else None,
                                            status=False)
                         await interaction.send(content=f'{message.jump_url} был успешно опубликован.',
                                                ephemeral=True)
@@ -175,8 +175,8 @@ class GeneralCommands(commands.Cog):
                         sql.update_recruiting(interaction.guild.id,
                                               channel.id,
                                               message.id,
-                                              sql_recruiting[2] if sql_recruiting[2] is not None else None,
-                                              sql_recruiting[3])
+                                              sql_recruiting['resume_channel_id'] if sql_recruiting['resume_channel_id'] is not None else None,
+                                              sql_recruiting['status'])
                         await interaction.send(f"{message.jump_url} был успешно отредактирован.",
                                                ephemeral=True)
                         from handler import update_panel

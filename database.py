@@ -3,7 +3,10 @@ from psycopg2 import DatabaseError, extensions
 from functools import wraps
 from time import sleep
 from psycopg2._psycopg import connection, cursor
+from psycopg2.extras import RealDictCursor
 from os import environ as env
+from datetime import date
+
 
 def retry(f):
     @wraps(f)
@@ -14,8 +17,8 @@ def retry(f):
             try:
                 return f(*args, **kw)
             except (psycopg2.InterfaceError, psycopg2.OperationalError) as e:
-                print ("\nDatabase Connection [InterfaceError or OperationalError]")
-                print ("Idle for %s seconds" % (cls._reconnectIdle))
+                print("\nDatabase Connection [InterfaceError or OperationalError]")
+                print("Idle for %s seconds" % (cls._reconnectIdle))
                 sleep(cls._reconnectIdle)
                 cls._connect()
     return wrapper
@@ -50,7 +53,7 @@ class Database(object):
                                                        user=self.user,
                                                        password=self.password,
                                                        database=self.database)
-        self.cur: cursor = self.connection.cursor()
+        self.cur: cursor = self.connection.cursor(cursor_factory=RealDictCursor)
         # self.my_connection = psycopg2.connect(**self.params)
         # self.my_cursor = self.my_connection.cursor()
 
@@ -59,8 +62,7 @@ class Database(object):
         self.cur.execute("SELECT VERSION()")
 
         version = self.cur.fetchone()
-
-        return "Database version: {}".format(version[0])
+        return "Database version: {}".format(version['version'])
 
     @retry
     def get_guild(self, guild_id: int):
@@ -83,6 +85,12 @@ class Database(object):
         return self.cur.fetchone()
 
     @retry
+    def get_recruiting_where_status_true(self):
+        self.cur.execute("""
+        SELECT * FROM recruitings WHERE status is True""")
+        return self.cur.fetchall()
+
+    @retry
     def get_resume_fields_order_by_row(self, guild_id: int):
         self.cur.execute("""
         SELECT * FROM resume_fields WHERE guild_id = '%s' ORDER BY field_row""",
@@ -90,11 +98,75 @@ class Database(object):
         return self.cur.fetchall()
 
     @retry
-    def get_tasks(self, guild_id: int):
+    def get_tasks(self, customer_guild_id: int = None, contactor_guild_id: int = None):
+        if customer_guild_id is not None:
+            self.cur.execute("""
+            SELECT * FROM tasks WHERE customer_guild_id = '%s'""",
+                             [customer_guild_id])
+            tasks: tuple = self.cur.fetchall()
+            print(tasks['23'])
+            return self.cur.fetchall()
+        elif contactor_guild_id is not None:
+            self.cur.execute("""
+            SELECT * FROM tasks WHERE contactor_guild_id = '%s'""",
+                             [contactor_guild_id])
+            return self.cur.fetchall()
+
+    @retry
+    def get_tasks_by_user_id(self, user_id: int):
         self.cur.execute("""
-        SELECT * FROM tasks WHERE guild_id = '%s'""",
-                         [guild_id])
+        SELECT * FROM tasks WHERE customer_id = '%s' OR contactor_id = '%s'""",
+                         [user_id, user_id])
         return self.cur.fetchall()
+
+    @retry
+    def get_tasks_by_customer_id(self, user_id: int):
+        self.cur.execute("""
+        SELECT * FROM tasks WHERE customer_id = '%s'""",
+                         [user_id, user_id])
+        return self.cur.fetchall()
+
+    @retry
+    def get_tasks_by_contactor_id(self, user_id: int):
+        self.cur.execute("""
+        SELECT * FROM tasks WHERE contactor_id = '%s'""",
+                         [user_id, user_id])
+        return self.cur.fetchall()
+
+    @retry
+    def get_tasks_by_thread_id(self, thread_id: int):
+        self.cur.execute("""
+        SELECT * FROM tasks WHERE customer_thread_id = '%s' OR contactor_thread_id = '%s'""",
+                         [thread_id, thread_id])
+        return self.cur.fetchone()
+
+    @retry
+    def get_task_by_task_id(self, task_id: int):
+        self.cur.execute("""
+        SELECT * FROM tasks WHERE task_id = %s""",
+                         [task_id])
+        return self.cur.fetchone()
+
+    @retry
+    def get_tasks_count(self):
+        self.cur.execute("""
+        SELECT MAX(task_id) FROM tasks """)
+        return self.cur.fetchone()
+
+    @retry
+    def get_tasks_order_by_price(self):
+        self.cur.execute("""
+        SELECT * FROM tasks ORDER BY price""")
+        return self.cur.fetchall()
+
+    @retry
+    def get_guilds_where_tasks_enabled(self):
+        self.cur.execute("""
+        SELECT * 
+        FROM guilds 
+        WHERE task_channel_id IS NOT NULL""")
+        return self.cur.fetchall()
+
 
     @retry
     def get_user(self, discord_id: int):
@@ -103,14 +175,21 @@ class Database(object):
                          [discord_id])
         return self.cur.fetchone()
 
+
+    @retry
+    def get_users(self, discord_id: int):
+        self.cur.execute("""
+        SELECT * FROM users """,)
+        return self.cur.fetchall()
+
     @retry
     def add_guild(self, guild_id: int, panel_channel_id: int = None, panel_message_id: int = None,
-                  citizen_role_id: int = None):
+                  citizen_role_id: int = None, subscription: date = None, invite: str = None):
         self.cur.execute("""
         INSERT INTO guilds
-        (guild_id, panel_channel_id, panel_message_id, citizen_role_id)
-        VALUES (%s, %s, %s, %s)""",
-                         [guild_id, panel_channel_id, panel_message_id, citizen_role_id])
+        (guild_id, panel_channel_id, panel_message_id, citizen_role_id, subscription_expires, invite)
+        VALUES (%s, %s, %s, %s, %s, %s)""",
+                         [guild_id, panel_channel_id, panel_message_id, citizen_role_id, subscription, invite])
         return self.connection.commit()
 
     @retry
@@ -134,14 +213,74 @@ class Database(object):
         return self.connection.commit()
 
     @retry
+    def add_task(self, guild_id: int, customer_id: str, customer_thread_id: int, item: str, description: str,
+                 customer_thread_message_id: int, price: int, global_status: bool = False):
+        self.cur.execute("""
+        INSERT INTO tasks
+        (customer_guild_id, customer_id, customer_thread_id, item, description,
+        price, global_status, customer_thread_message_id)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+                         [guild_id, customer_id, customer_thread_id, item, description, price, global_status,
+                          customer_thread_message_id])
+        return self.connection.commit()
+
+    @retry
     def update_guild(self, guild_id: int, panel_channel_id: int = None, panel_message_id: int = None,
-                     citizen_role_id: int = None):
+                     citizen_role_id: int = None, subscription_expires: str = None,
+                     recruiting_channel_id: int = None,
+                     recruiting_message_id: int = None, resume_channel_id: int = None, recruiting_status: bool = None,
+                     task_channel_id: int = None, task_issue_thread_id: int = None, task_tag_global_id: int = None,
+                     task_tag_waiting_id: int = None, task_tag_in_progress_id: int = None,
+                     task_tag_complete_id: int = None):
         self.cur.execute("""
         UPDATE guilds 
-        SET panel_channel_id = %s, panel_message_id = %s, citizen_role_id = %s
+        SET panel_channel_id = %s, panel_message_id = %s, citizen_role_id = %s, subscription_expires = %s,
+        recruiting_channel_id = %s, recruiting_message_id = %s, resume_channel_id = %s, recruiting_status = %s,
+        task_channel_id = %s, task_issue_thread_id = %s, task_tag_global_id = %s, task_tag_waiting_id = %s,
+        task_tag_in_progress_id = %s, task_tag_complete_id = %s
         WHERE guild_id = %s
         """,
-                         [panel_channel_id, panel_message_id, citizen_role_id, guild_id])
+                         [panel_channel_id, panel_message_id, citizen_role_id,  subscription_expires,
+                          recruiting_channel_id, recruiting_message_id, resume_channel_id, recruiting_status,
+                          task_channel_id, task_issue_thread_id, task_tag_global_id, task_tag_waiting_id,
+                          task_tag_in_progress_id, task_tag_complete_id,
+                          guild_id])
+        return self.connection.commit()
+
+    @retry
+    def update_panel(self, guild_id: int, panel_channel_id: int, panel_message_id: int):
+        self.cur.execute("""
+        UPDATE guilds
+        SET panel_channel_id = %s, panel_message_id = %s
+        WHERE guild_id = %s
+        """, [panel_channel_id, panel_message_id,  guild_id])
+        return self.connection.commit()
+
+    @retry
+    def update_citizen_role_id(self, guild_id: int, citizen_role_id: int):
+        self.cur.execute("""
+        UPDATE guilds
+        SET citizen_role_id = %s
+        WHERE guild_id = %s
+        """, [citizen_role_id, guild_id])
+        return self.connection.commit()
+
+    @retry
+    def update_subscription(self, guild_id: int, subscription_expires: str):
+        self.cur.execute("""
+        UPDATE guilds
+        SET subscription_expires = %s
+        WHERE guild_id = %s
+        """, [subscription_expires, guild_id])
+        return self.connection.commit()
+
+    @retry
+    def update_invite(self, guild_id: int, invite: str):
+        self.cur.execute("""
+        UPDATE guilds
+        SET invite = %s
+        WHERE guild_id = %s
+        """, [invite, guild_id])
         return self.connection.commit()
 
     @retry
@@ -186,6 +325,32 @@ class Database(object):
         WHERE guild_id = %s
         """,
                          [status, guild_id])
+        return self.connection.commit()
+
+    @retry
+    def update_guild_task(self, guild_id: int, task_channel_id: int, task_issue_thread_id: int, task_tag_global_id: int,
+                          task_tag_waiting_id: int, task_tag_in_progress_id: int, task_tag_complete_id: int,
+                          task_webhook_url: str):
+        self.cur.execute("""
+        UPDATE guilds
+        SET task_channel_id = %s, task_issue_thread_id = %s,  task_tag_global_id = %s,
+         task_tag_waiting_id = %s, task_tag_in_progress_id = %s, task_tag_complete_id = %s, task_webhook_url = %s
+        WHERE guild_id = %s 
+        """,
+                         [task_channel_id, task_issue_thread_id, task_tag_global_id, task_tag_waiting_id,
+                          task_tag_in_progress_id, task_tag_complete_id, task_webhook_url, guild_id])
+        return self.connection.commit()
+
+    @retry
+    def update_task_accept(self, contactor_id: int, contactor_thread_id: int, contactor_guild_id: int,
+                           contactor_thread_message_id: int, customer_thread_id: int):
+        self.cur.execute("""
+        UPDATE tasks
+        SET contactor_id = %s, contactor_thread_id = %s,  contactor_guild_id = %s, contactor_thread_message_id = %s
+        WHERE customer_thread_id = %s 
+        """,
+                         [contactor_id, contactor_thread_id, contactor_guild_id, contactor_thread_message_id,
+                          customer_thread_id])
         return self.connection.commit()
 
     @retry

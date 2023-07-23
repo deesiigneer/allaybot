@@ -36,9 +36,9 @@ class Check:
         if sql_guild is not None:
             perms: Permissions = guild.get_member(bot.user.id).guild_permissions
             if perms.manage_channels and perms.send_messages:
-                panel_channel_id = sql_guild[1]
-                panel_message_id = sql_guild[3]
-                citizen_role_id = sql_guild[2]
+                panel_channel_id = sql_guild['guild_id']
+                panel_message_id = sql_guild['panel_message_id']
+                citizen_role_id = sql_guild['citizen_role_id']
                 panel_channel = guild.get_channel(panel_channel_id)
                 if panel_channel is not None:
                     panel_message = panel_channel.get_partial_message(panel_message_id)
@@ -53,15 +53,15 @@ class Check:
                                            channel: TextChannel = None, message: Message = None):
         sql_guild = sql.get_guild(self.guild.id)
         if sql_guild:
-            guild = self.bot.get_guild(sql_guild[0])
+            guild = self.bot.get_guild(sql_guild['guild_id'])
             if guild:
                 repair = 0
-                if sql_guild[1]:
-                    panel_channel = self.bot.get_guild(sql_guild[0]).get_channel(sql_guild[1])
+                if sql_guild['panel_channel_id']:
+                    panel_channel = self.bot.get_guild(sql_guild['guild_id']).get_channel(sql_guild['panel_channel_id'])
                     if not panel_channel:
-                        await self.log_channel.send(f'channel with id `{sql_guild[1]}` not found in:\n'
+                        await self.log_channel.send(f'channel with id `{sql_guild["panel_channel_id"]}` not found in:\n'
                                                     f'guild: `{self.guild.id}`')
-                        await interaction.send(f'Канал с id {sql_guild[1]} не найден!\n'
+                        await interaction.send(f'Канал с id {sql_guild["panel_channel_id"]} не найден!\n'
                                                f'Возможно его удалили, что бы починить используйте команду /repair',
                                                ephemeral=True)
                         repair = 1
@@ -71,18 +71,18 @@ class Check:
                     await self.log_channel.send(f'У `{self.guild.id}` нету канала с панелью... создаю.')
                     if guild.me.guild_permissions.manage_channels:
                         panel_channel = await guild.create_text_channel(name=f'🤖ㆍ{self.bot.user.display_name}-panel')
-                        sql.update_guild(sql_guild[0], panel_channel.id, sql_guild[3], sql_guild[2])
+                        sql.update_panel(sql_guild['guild_id'], panel_channel.id)
                         await update_panel(self.bot, guild)
                     else:
                         await self.log_channel.send(f'Неудалось создать панель для guild `{self.guild.id}`'
                                                     f' недостаточно прав. ||manage_channels||')
                 sql_guild = sql.get_guild(self.guild.id)
-                panel_msg = self.bot.get_guild(sql_guild[0]).get_channel(sql_guild[1]).get_partial_message(sql_guild[3])
+                panel_msg = self.bot.get_guild(sql_guild['guild_id']).get_channel(sql_guild['panel_channel_id']).get_partial_message(sql_guild["panel_message_id"])
                 if not panel_msg:
-                    await self.log_channel.send(f'message with id `{sql_guild[3]}` not found in:\n'
-                                                f'channel: `{self.bot.get_guild(sql_guild[0]).get_channel(sql_guild[1]).id}`\n'
+                    await self.log_channel.send(f'message with id `{sql_guild["panel_message_id"]}` not found in:\n'
+                                                f'channel: `{self.bot.get_guild(sql_guild["guild_id"]).get_channel(sql_guild["panel_channel_id"]).id}`\n'
                                                 f'guild: `{self.guild.id}`')
-                    await interaction.send(f'Сообщение с id {sql_guild[3]} в канале с id {sql_guild[1]} не найден!\n'
+                    await interaction.send(f'Сообщение с id {sql_guild["panel_message_id"]} в канале с id {sql_guild["panel_channel_id"]} не найден!\n'
                                            f'Возможно его удалили, что бы починить используйте команду /repair',
                                            ephemeral=True)
                     pass
@@ -94,7 +94,7 @@ class Check:
             based = await self.log_channel.send(f'{self.guild.id} не найдена в базе данных, добавляю..')
             print(type(self.guild.id))
             if self.bot.get_guild(self.guild.id):
-                sql.add_guild(self.guild.id, None, None, None)
+                sql.add_guild(self.guild.id, None, None, None, None, None)
                 await Check(self.bot, self.guild).comparison_database_to_guild(interaction)
                 pass
             else:
@@ -110,25 +110,34 @@ async def update_panel(bot: commands.Bot, guild: Guild) -> None:
         recruiting_status = False
         citlist_channel = None
         citizen_role = None
-        sql_guild: list = sql.get_guild(guild.id)
-        sql_recruiting: list = sql.get_recruiting(guild.id)
+        sql_guild = sql.get_guild(guild.id)
+        sql_recruiting = sql.get_recruiting(guild.id)
         print(f'updatepanel {sql_guild}')
         if sql_guild:
-            panel_channel = guild.get_channel(sql_guild[1]) if sql_guild[1] is not None else None
-            citizen_role = guild.get_role(sql_guild[2]) if sql_guild[2] is not None else None
+            panel_channel = guild.get_channel(sql_guild['panel_channel_id']) if sql_guild['panel_channel_id'] is not None else None
+            citizen_role = guild.get_role(sql_guild['citizen_role_id']) if sql_guild['citizen_role_id'] is not None else None
             if sql_recruiting:
-                recruiting_channel = guild.get_channel(sql_recruiting[1]) if sql_recruiting[1] is not None else None
-                resume_channel = guild.get_channel(sql_recruiting[2]) if sql_recruiting[2] is not None else None
-                recruiting_status: bool = sql_recruiting[3] if sql_recruiting[3] is not None else None
-        embed = Embed(title=f'Управление городом - `{guild.name}`', colour=0x2f3136)
+                recruiting_channel = guild.get_channel(sql_recruiting['recruiting_channel_id']) if sql_recruiting['recruiting_channel_id'] is not None else None
+                resume_channel = guild.get_channel(sql_recruiting['resume_channel_id']) if sql_recruiting['resume_channel_id'] is not None else None
+                recruiting_status: bool = sql_recruiting['status'] if sql_recruiting['status'] is not None else None
+        from datetime import datetime
+        subscription = datetime.combine(sql_guild['subscription_expires'], datetime.min.time()) if sql_guild['subscription_expires'] is not None else None
+        print('sub', subscription)
+        embed = Embed(title=f'Управление городом - `{guild.name}`', colour=0x2f3136, timestamp=subscription)
         embed.set_thumbnail(guild.icon.url if guild.icon is not None else
                             'https://static.wikia.nocookie.net/minecraft_gamepedia/images/4/45/Allay_JE2.gif')
         embed.set_author(name=f'{bot.user.display_name} panel',
                          icon_url=bot.user.avatar.url,
                          url='https://discord.gg/VbyHaKRAaN')
         # https://img.icons8.com/color/48/null/dashboard-layout.png
-        embed.set_footer(text='dev by deesiigneer',
-                         icon_url='https://visage.surgeplay.com/face/512/63ed47877aa3470fbfc46c5356c3d797.png')
+        if subscription is not None:
+            sub = subscription.isoformat()
+            now = datetime.utcnow().isoformat()
+            embed.set_footer(text=f'Премиум подписка {"активна до" if sub > now else "истекла"}',
+                             icon_url='https://static.wikia.nocookie.net/minecraft_gamepedia/images/4/45/Allay_JE2.gif')
+        else:
+            embed.set_footer(text=f'Нету активной премиум подписки',
+                             icon_url='https://static.wikia.nocookie.net/minecraft_gamepedia/images/4/45/Allay_JE2.gif')
         if citizen_role is None:
             embed.description = f"**Роль жителя не установлена.**"
         if citizen_role is not None:
@@ -163,13 +172,12 @@ async def update_panel(bot: commands.Bot, guild: Guild) -> None:
             if msg is None:
                 from buttons.general import BotPanelButtons
                 msg = await panel_channel.send(embeds=embeds, view=BotPanelButtons())
-            sql.update_guild(
+            sql.update_panel(
                 guild.id,
                 panel_channel.id if panel_channel is not None else None,
-                msg.id if msg is not None else None,
-                citizen_role.id if citizen_role is not None else None,
-
-            )
+                msg.id if msg is not None else None)
+            if citizen_role is not None:
+                sql.update_citizen_role_id(citizen_role.id)
         return
     except PermissionError as e:
         raise f"Don`t enough permission for send message to system channel! {e}"
@@ -183,10 +191,10 @@ async def update_applications_panel(bot: commands.Bot, guild: Guild):
     sql_recruiting: list = sql.get_recruiting(guild.id)
     await Check(bot, guild).channels_exist()
     if sql_recruiting is not None:
-        recruiting_channel = guild.get_channel(sql_recruiting[1])
-        resume_channel = guild.get_channel(sql_recruiting[2])
-        status = bool(sql_recruiting[3])
-        recruiting_message = recruiting_channel.get_partial_message(sql_recruiting[4]) if sql_recruiting[4] is not None else None
+        recruiting_channel = guild.get_channel(sql_recruiting['recruiting_channel_id'])
+        resume_channel = guild.get_channel(sql_recruiting['resume_channel_id'])
+        status = bool(sql_recruiting['status'])
+        recruiting_message = recruiting_channel.get_partial_message(sql_recruiting['recruiting_message_id']) if sql_recruiting['recruiting_message_id'] is not None else None
     disabled_emoji: Emoji = bot.get_emoji(1038421382477922384)
     enabled_emoji: Emoji = bot.get_emoji(1038421381085401088)
     embed = Embed(title=f'Настройка заявок в город `{guild.name}` {enabled_emoji if status else disabled_emoji}',
@@ -207,12 +215,13 @@ async def update_applications_panel(bot: commands.Bot, guild: Guild):
 
 async def update_resume_preview(interaction: Interaction, preview_labels: list = None, channel: TextChannel = None):
     sql_user = sql.get_user(interaction.user.id)
-    spapi = SPAPI('6273cba5-add3-44b8-a9a6-d528fcf0f29a', 'hQvWsc9FssggbtNXukG/3XbgNXtyTgos')
-    sp_user = spapi.get_user(interaction.user.id)
-    if sql_user is None and sp_user is not None:
-        sql.add_user(interaction.user.id, MojangAPI().get_uuid(sp_user.username))
-    elif sql_user is None and sp_user is None:
-        return [None, None]
+    if sql_user is None:
+        try:
+            spapi = SPAPI('6273cba5-add3-44b8-a9a6-d528fcf0f29a', 'hQvWsc9FssggbtNXukG/3XbgNXtyTgos')
+            sp_user = spapi.get_user(interaction.user.id)
+            sql.add_user(interaction.user.id, MojangAPI().get_uuid(sp_user.username))
+        except:
+            return [None, None]
     else:
         # TODO: проверка на никнейм by pyspapi
         embed = Embed(title=f'Заявка №{len(await channel.history().flatten()) if channel is not None else "ПРЕДПРОСМОТР"}',
@@ -223,14 +232,14 @@ async def update_resume_preview(interaction: Interaction, preview_labels: list =
             user = sql_user
         embed.set_author(
             name=f'{interaction.user.nick if interaction.user.nick is not None else interaction.user.display_name}',
-            url=f'https://namemc.com/profile/{user[1]}' if user is not None else None,
-            icon_url=f'https://visage.surgeplay.com/face/512/{user[1]}.png' if user is not None else None
+            url=f'https://namemc.com/profile/{user["minecraft_uid"]}' if user is not None else None,
+            icon_url=f'https://visage.surgeplay.com/face/512/{user["minecraft_uid"]}.png' if user is not None else None
         )
         sql_resume_fields = sql.get_resume_fields_order_by_row(interaction.guild.id)
         if sql_resume_fields is not None:
             for index, field in enumerate(sql_resume_fields):
                 embed.add_field(
-                    name=field[1],
+                    name=field['field_name'],
                     value=f'{preview_labels[index] if preview_labels is not None else "*ПРЕДПРОСМОТР*"}',
                     inline=False)
         if interaction.user.avatar is not None:
