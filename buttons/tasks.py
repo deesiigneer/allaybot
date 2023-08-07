@@ -7,6 +7,24 @@ from database import sql
 from sys import exc_info
 
 
+async def tasks_embed(bot: Client, guild: Guild, tasks_guild, current_page=None, max_pages=None, edit: bool = None, delete: bool = None):
+    embed = Embed(color=0x2f3136)
+    if guild is None:
+        embed.title = 'Error'
+    else:
+        embed.title = 'Задания созданные мной:'
+        embed.description = ''
+        embed.set_author(name=guild.name,
+                         url=f'https://discord.gg/{tasks_guild["invite"]}',
+                         icon_url=guild.icon.url if guild.icon is not None else None)
+        embed.set_footer(text=guild.id)
+        embed.add_field(name='Кол-во жителей:', value=len(guild.get_role(tasks_guild['citizen_role_id']).members))
+        embed.add_field(name='Ссылка на дискорд сервер города:', value=f'https://discord.gg/{tasks_guild["invite"]}')
+        if guild.banner is not None:
+            embed.image.url = guild.banner.url
+    return embed
+
+
 class TasksModuleSetup(View):
     def __init__(self, interaction: Interaction = None):
         super().__init__(timeout=None)
@@ -316,9 +334,11 @@ class TaskChoiceSelect(Select):
                 await interaction.send(content='У вас нету прав :(', ephemeral=True)
         elif self.values[0] == 'edit_task':
             tasks = sql.get_tasks_by_customer_id(interaction.user.id)
+            print(tasks)
             embed = Embed(title='Редактирование задачи', description='Описание')
             await interaction.send(embed=embed, ephemeral=True)
         elif self.values[0] == 'delete_task':
+            tasks = sql.get_tasks_by_customer_id(interaction.user.id)
             embed = Embed(title='Удаление задачи', description='Описание')
             await interaction.send(embed=embed, ephemeral=True)
 

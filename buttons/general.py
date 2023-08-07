@@ -214,20 +214,11 @@ class HelpChoice(Select):
         await interaction.edit(view=HelpButtons())
         if self.values[0] == 'help_city_list':
             data: dict = sql.get_recruiting_where_status_true()
-            print('2', data)
             for index, d in enumerate(data):
-                print('3', d)
                 if not interaction.client.get_guild(d['guild_id']):
-                    print('4', d)
-                    print(5, data)
                     del data[index]
-                    print(6, d)
-                    print(7, data)
-            print(data)
-            print(type(data))
             pages = GuildsMenuPages(source=GuildPages(list(data)))
-            print(interaction.data)
-            await pages.start(interaction=interaction, ephemeral=True, channel=interaction.user.dm_channel)
+            await pages.start(interaction=interaction, ephemeral=True)
         elif self.values[0] == 'help_tasks_list':
             await interaction.send(ephemeral=True, content='in dev...')
 

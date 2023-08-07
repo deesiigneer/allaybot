@@ -123,14 +123,14 @@ class Database(object):
     def get_tasks_by_customer_id(self, user_id: int):
         self.cur.execute("""
         SELECT * FROM tasks WHERE customer_id = '%s'""",
-                         [user_id, user_id])
+                         [user_id])
         return self.cur.fetchall()
 
     @retry
     def get_tasks_by_contactor_id(self, user_id: int):
         self.cur.execute("""
         SELECT * FROM tasks WHERE contactor_id = '%s'""",
-                         [user_id, user_id])
+                         [user_id])
         return self.cur.fetchall()
 
     @retry
