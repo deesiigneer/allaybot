@@ -218,6 +218,108 @@ class TasksAccept(View):
                                 button.disabled = True
                                 print(button.disabled)
                                 await message.edit(embed=_embed, view=self)
+                    elif thread.name.startswith(f"#{task_id} {sql_task['item']}"):
+                        thread = interaction.channel
+                        print('solo')
+                        forum_tags = [ForumTag(name='Ожидают', id=sql_guild['task_tag_in_progress_id'])]
+                        await thread.edit(applied_tags=forum_tags)
+                        button.disabled = True
+                        await interaction.edit(embed=_embed, view=self)
+
+            sql.update_task_accept(interaction.user.id,
+                                   interaction.channel.id,
+                                   interaction.guild.id,
+                                   interaction.message.id,
+                                   sql_task['customer_thread_id'])
+        else:
+            await interaction.send('something wrong...', ephemeral=True)
+
+
+class TasksDone(View):
+
+    def __init__(self, thread: int = None):
+        thread_id = thread
+        super().__init__(timeout=None)
+
+    @button(label='Завершить', emoji='👋', style=ButtonStyle.green, row=1, custom_id=f'task_accept')
+    async def task_accept(self, button: Button, interaction: Interaction):
+        task_id = None
+        embed = None
+        for embed in interaction.message.embeds:
+            task_id = f'{interaction.channel.name.split("#")[1].split(" ")[0]}'
+        sql_task = sql.get_task_by_task_id(int(task_id)+1)
+        print(sql_task)
+        if sql_task:
+            customer_guild = interaction.client.get_guild(sql_task['customer_guild_id'])
+            print(customer_guild, sql_task['customer_guild_id'])
+            customer_thread = await interaction.client.fetch_channel(sql_task['customer_thread_id'])
+            print('123321', customer_thread, sql_task['customer_thread_id'])
+            customer = await interaction.client.fetch_user(sql_task['customer_id'])
+            _embed = None
+            for _embed in interaction.message.embeds:
+                _embed: Embed = _embed
+            user = interaction.user
+            await interaction.send(f'{user.mention}, ты принял заказ #{task_id}!', ephemeral=True)
+            user = sql.get_user(interaction.user.id)
+            from pyspapi import SPAPI, MojangAPI
+            if user:
+                username = MojangAPI.get_username(user["minecraft_uid"])
+                await customer_thread.send(content=f'{customer.mention}, '
+                                                   f'{interaction.user.mention} (`'
+                                                   f'{username}`) '
+                                                   f'принял Ваш заказ!\n\n'
+                                                   f'Вы можете вести диалог прямо в этом канале!',
+                                           embed=embed)
+                footer_text = f"Принял - {username}"
+                avatar_url = f'https://visage.surgeplay.com/face/512/{user["minecraft_uid"]}.png'
+            else:
+                spapi = SPAPI('6273cba5-add3-44b8-a9a6-d528fcf0f29a',
+                              'hQvWsc9FssggbtNXukG/3XbgNXtyTgos')
+                try:
+                    user = spapi.get_user(interaction.user.id)
+                except:
+                    user = None
+                m_user = MojangAPI.get_uuid(user.username)
+                if user:
+                    sql.add_user(interaction.user.id, MojangAPI.get_uuid(user.username))
+                    await customer_thread.send(content=f'{customer.mention}, '
+                                                       f'{interaction.user.mention} (`{user.username}`) '
+                                                       f'принял Ваш заказ!\n\n'
+                                                       f'Вы можете вести диалог прямо в этом канале!',
+                                               embed=embed)
+                avatar_url = f'https://visage.surgeplay.com/face/512/{m_user}.png' if user is not None else None
+                footer_text = f"Принял - {user.username}"
+            _embed.set_footer(text=footer_text, icon_url=avatar_url)
+            print('3333', _embed.footer.text)
+            self.disabled = True
+            sql_guilds: dict = sql.get_guilds()
+            print("guilds", type(sql_guilds), sql_guilds)
+            for sql_guild in sql_guilds:
+                guild = interaction.client.get_guild(sql_guild['guild_id'])
+                for thread in guild.threads:
+                    # TODO: check solo task
+                    if thread.name.startswith(f"🌐 #{task_id} {sql_task['item']}"):
+                        print('th name',thread.name)
+                        forum_tags = [ForumTag(name='Глобальный', id=sql_guild['task_tag_global_id']),
+                            ForumTag(name='Ожидают', id=sql_guild['task_tag_in_progress_id'])]
+                        await thread.edit(applied_tags=forum_tags)
+                        async for message in thread.history(limit=10, oldest_first=True):
+                            if message.author == interaction.client.user and message.content == '':
+                                print('yes')
+                                print(_embed.footer.text)
+                                print(button.disabled)
+                                print(self.disabled)
+                                button.disabled = True
+                                print(button.disabled)
+                                await message.edit(embed=_embed, view=self)
+                    elif thread.name.startswith(f"#{task_id} {sql_task['item']}"):
+                        thread = interaction.channel
+                        print('solo')
+                        forum_tags = [ForumTag(name='Ожидают', id=sql_guild['task_tag_in_progress_id'])]
+                        await thread.edit(applied_tags=forum_tags)
+                        button.disabled = True
+                        await interaction.edit(embed=_embed, view=self)
+
             sql.update_task_accept(interaction.user.id,
                                    interaction.channel.id,
                                    interaction.guild.id,

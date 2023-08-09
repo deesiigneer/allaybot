@@ -220,29 +220,31 @@ async def update_resume_preview(interaction: Interaction, preview_labels: list =
             spapi = SPAPI('6273cba5-add3-44b8-a9a6-d528fcf0f29a', 'hQvWsc9FssggbtNXukG/3XbgNXtyTgos')
             sp_user = spapi.get_user(interaction.user.id)
             sql.add_user(interaction.user.id, MojangAPI().get_uuid(sp_user.username))
-        except:
+        except Exception as e:
+            await interaction.send(ephemeral=True, content=f'Что-то пошло не так... \n\n ||{e}||')
             return [None, None]
-    else:
-        # TODO: проверка на никнейм by pyspapi
-        embed = Embed(title=f'Заявка №{len(await channel.history().flatten()) if channel is not None else "ПРЕДПРОСМОТР"}',
-                      description=f'От - {interaction.user.mention}',
-                      color=0x2f3136)
-        user = None
-        if sql_user is not None:
-            user = sql_user
-        embed.set_author(
-            name=f'{interaction.user.nick if interaction.user.nick is not None else interaction.user.display_name}',
-            url=f'https://namemc.com/profile/{user["minecraft_uid"]}' if user is not None else None,
-            icon_url=f'https://visage.surgeplay.com/face/512/{user["minecraft_uid"]}.png' if user is not None else None
-        )
-        sql_resume_fields = sql.get_resume_fields_order_by_row(interaction.guild.id)
-        if sql_resume_fields is not None:
-            for index, field in enumerate(sql_resume_fields):
-                embed.add_field(
-                    name=field['field_name'],
-                    value=f'{preview_labels[index] if preview_labels is not None else "*ПРЕДПРОСМОТР*"}',
-                    inline=False)
-        if interaction.user.avatar is not None:
-            embed.set_footer(text=f'{interaction.user.name}#{interaction.user.discriminator}',
-                             icon_url=interaction.user.avatar.url)
-        return [embed, sql_resume_fields]
+            # TODO
+        finally:
+            # TODO: проверка на никнейм by pyspapi
+            embed = Embed(title=f'Заявка №{len(await channel.history().flatten()) if channel is not None else "ПРЕДПРОСМОТР"}',
+                          description=f'От - {interaction.user.mention}',
+                          color=0x2f3136)
+            user = None
+            if sql_user is not None:
+                user = sql_user
+            embed.set_author(
+                name=f'{interaction.user.nick if interaction.user.nick is not None else interaction.user.display_name}',
+                url=f'https://namemc.com/profile/{user["minecraft_uid"]}' if user is not None else None,
+                icon_url=f'https://visage.surgeplay.com/face/512/{user["minecraft_uid"]}.png' if user is not None else None
+            )
+            sql_resume_fields = sql.get_resume_fields_order_by_row(interaction.guild.id)
+            if sql_resume_fields is not None:
+                for index, field in enumerate(sql_resume_fields):
+                    embed.add_field(
+                        name=field['field_name'],
+                        value=f'{preview_labels[index] if preview_labels is not None else "*ПРЕДПРОСМОТР*"}',
+                        inline=False)
+            if interaction.user.avatar is not None:
+                embed.set_footer(text=f'{interaction.user.name}#{interaction.user.discriminator}',
+                                 icon_url=interaction.user.avatar.url)
+            return [embed, sql_resume_fields]
