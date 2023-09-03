@@ -25,22 +25,24 @@ class Bot(commands.Bot):
     async def on_ready(self):
         if not self.persistent_views_added:
             self.persistent_views_added = True
-            from buttons.general import BotPanelButtons, HelpButtons
-            from buttons.applications import ButtonRecruiting, CreateRecruiting, ApplicationToCityButtons,\
+            from main_buttons import BotPanelButtons, HelpButtons
+            from modules.requests.buttons import ButtonRecruiting, CreateRecruiting, ApplicationToCityButtons,\
                 ResumeEdit
-            from buttons.tasks import TasksModuleSetup, TasksChoice, TasksConfig, TasksAccept, NewTask
-            self.add_view(HelpButtons())
-            self.add_view(TasksModuleSetup())
-            self.add_view(ButtonRecruiting())
+            from modules.tasks.buttons import TasksModuleSetup, TasksChoice, TasksConfig, TasksAccept, NewTask
             self.add_view(BotPanelButtons())
+            self.add_view(HelpButtons())
+            # requests
+            self.add_view(ButtonRecruiting())
             self.add_view(CreateRecruiting())
-            # self.add_view(ExtendedInstallation())
-            self.add_view(ApplicationToCityButtons())
             self.add_view(ResumeEdit())
+            self.add_view(ApplicationToCityButtons())
+            # tasks
+            self.add_view(TasksModuleSetup())
             self.add_view(TasksChoice())
             self.add_view(TasksConfig())
             self.add_view(TasksAccept())
             self.add_view(NewTask())
+            # self.add_view(ExtendedInstallation())
 
         sql_guilds = sql.get_guilds()
         guild_db_list = [sql_guild['guild_id'] for sql_guild in sql_guilds]
@@ -77,7 +79,7 @@ class Bot(commands.Bot):
             if type(message.channel) == DMChannel:
                 if 'помощь' in message.content.lower():
                     guilds = sql.get_guilds
-                    from buttons.general import HelpButtons
+                    from main_buttons import HelpButtons
                     await message.reply(content=f'Привет, {message.author.mention}!\n\n',
                                         view=HelpButtons())
                     # TODO: guilds list

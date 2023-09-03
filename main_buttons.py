@@ -149,7 +149,7 @@ class BotPanelButtons(View):
         super().__init__(timeout=None)
         self.add_item(ModuleChoice())
 
-    @button(label='Обновить', emoji='🔃', style=ButtonStyle.blurple, row=2, custom_id='settings_panel_update')
+    @button(label='Обновить', emoji='🔃', style=ButtonStyle.blurple, row=2, custom_id='settings_panel_upd')
     async def update(self, button: Button, interaction: Interaction):
         print('updating panel')
         from handler import update_panel, Check
@@ -220,38 +220,39 @@ class HelpChoice(Select):
             await interaction.send(ephemeral=True, content='in dev...')
 
 
-# class ModuleChoice(Select):
-#
-#     def __init__(self):
-#         select_options = []
-#         import modules
-#         for module in modules.list:
-#             from importlib.machinery import SourceFileLoader
-#             config = SourceFileLoader("config", f"modules/{module}/config.py").load_module()
-#             print(f"label={config.label}")
-#             print(f"description={config.description}")
-#             print(f"emoji={config.emoji}")
-#             print(f"value={config.value}")
-#             select_options.append(SelectOption(
-#                     label=f'{config.label}',
-#                     description=f'{config.description}',  # TODO
-#                     emoji=f'{config.emoji}',
-#                     value=f'{config.value}'))
-#
-#         super().__init__(placeholder="Выберите модуль",
-#                          min_values=1,
-#                          max_values=1,
-#                          options=select_options,
-#                          custom_id='ModuleChoice',
-#                          row=0)
-#
-#     async def callback(self, interaction: Interaction):
-#         import modules
-#         for module in modules.list:
-#             from importlib.machinery import SourceFileLoader
-#             config = SourceFileLoader("config", f"modules/{module}/config.py").load_module()
-#             if self.values[0] == config.value:
-#                 await config.moudle_callback(interaction)
+class ModuleChoice(Select):
+
+    def __init__(self):
+        select_options = []
+        import modules
+        for module in modules.list:
+            print(f'module list = {module}')
+            from importlib.machinery import SourceFileLoader
+            config = SourceFileLoader("config", f"modules/{module}/config.py").load_module()
+            print(f"label={config.label}")
+            print(f"description={config.description}")
+            print(f"emoji={config.emoji}")
+            print(f"value={config.value}")
+            select_options.append(SelectOption(
+                    label=f'{config.label}',
+                    description=f'{config.description}',  # TODO
+                    emoji=f'{config.emoji}',
+                    value=f'{config.value}'))
+
+        super().__init__(placeholder="Выберите модуль",
+                         min_values=1,
+                         max_values=1,
+                         options=select_options,
+                         custom_id='ModuleChoice',
+                         row=0)
+
+    async def callback(self, interaction: Interaction):
+        import modules
+        for module in modules.list:
+            from importlib.machinery import SourceFileLoader
+            config = SourceFileLoader("config", f"modules/{module}/config.py").load_module()
+            if self.values[0] == config.value:
+                await config.module_callback(interaction)
         # elif self.values[0] == 'tasks':
         #     sql_guild = sql.get_guild(interaction.guild.id)
         #     subscription: datetime.date = sql_guild['subscription_expires'] if sql_guild is not None else None

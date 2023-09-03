@@ -78,16 +78,16 @@ class Database(object):
         return self.cur.fetchall()
 
     @retry
-    def get_recruiting(self, guild_id: int):
+    def get_requests(self, guild_id: int):
         self.cur.execute("""
-        SELECT * FROM recruitings WHERE guild_id = '%s'""",
+        SELECT * FROM requests WHERE guild_id = '%s'""",
                          [guild_id])
         return self.cur.fetchone()
 
     @retry
-    def get_recruiting_where_status_true(self):
+    def get_requests_where_status_true(self):
         self.cur.execute("""
-        SELECT * FROM recruitings WHERE status is True""")
+        SELECT * FROM requests WHERE status is True""")
         return self.cur.fetchall()
 
     @retry
@@ -99,6 +99,21 @@ class Database(object):
 
     @retry
     def get_tasks(self, customer_guild_id: int = None, contactor_guild_id: int = None):
+        if customer_guild_id is not None:
+            self.cur.execute("""
+            SELECT * FROM tasks WHERE customer_guild_id = '%s'""",
+                             [customer_guild_id])
+            tasks: tuple = self.cur.fetchall()
+            print(tasks['23'])
+            return self.cur.fetchall()
+        elif contactor_guild_id is not None:
+            self.cur.execute("""
+            SELECT * FROM tasks WHERE contactor_guild_id = '%s'""",
+                             [contactor_guild_id])
+            return self.cur.fetchall()
+
+    @retry
+    def get_tasks_order_by_waiting(self, customer_guild_id: int = None, contactor_guild_id: int = None):
         if customer_guild_id is not None:
             self.cur.execute("""
             SELECT * FROM tasks WHERE customer_guild_id = '%s'""",
@@ -196,7 +211,7 @@ class Database(object):
     def add_recruiting(self, guild_id: int, recruiting_channel_id: int, recruiting_message_id: int,
                        resume_channel_id: int, status: bool):
         self.cur.execute("""
-        INSERT INTO recruitings
+        INSERT INTO requests
         (guild_id, recruiting_channel_id, recruiting_message_id, resume_channel_id, status)
         VALUES (%s, %s, %s, %s, %s)""",
                          [guild_id, recruiting_channel_id, recruiting_message_id, resume_channel_id, status])
@@ -287,7 +302,7 @@ class Database(object):
     def update_recruiting(self, guild_id: int, recruiting_channel_id: int, recruiting_message_id: int,
                           resume_channel_id: int, status: bool):
         self.cur.execute("""
-        UPDATE recruitings 
+        UPDATE requests 
         SET recruiting_channel_id = %s, recruiting_message_id = %s, resume_channel_id = %s, status = %s
         WHERE guild_id = %s
         """,
@@ -320,7 +335,7 @@ class Database(object):
     @retry
     def update_recruiting_status(self, guild_id: int, status: bool):
         self.cur.execute("""
-        UPDATE recruitings 
+        UPDATE requests 
         SET status = %s
         WHERE guild_id = %s
         """,
@@ -375,7 +390,7 @@ class Database(object):
     @retry
     def delete_recruiting(self, guild_id: int):
         self.cur.execute("""
-        DELETE FROM recruitings 
+        DELETE FROM requests 
         WHERE guild_id = %s
         """,
                          [guild_id])

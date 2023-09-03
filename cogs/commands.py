@@ -57,7 +57,7 @@ class GeneralCommands(commands.Cog):
                      channel: TextChannel = SlashOption(name='channel',
                                                         description='Канал в который будут поступать заявки',
                                                         required=True)):
-        sql_recruiting = sql.get_recruiting(interaction.guild.id)
+        sql_recruiting = sql.get_requests(interaction.guild.id)
         if sql_recruiting is not None:
             sql.update_recruiting(interaction.guild.id,
                                   sql_recruiting['recruiting_channel_id'],
@@ -88,6 +88,25 @@ class GeneralCommands(commands.Cog):
             f'members: {interaction.client.get_guild(guild).members}\n',
             ephemeral=True)
 
+    @slash_command(description='for bot owner only.', guild_ids=[850091193190973472, 1102196413233905696])
+    @application_checks.is_owner()
+    async def test(self, interaction: Interaction):
+        # import modules
+        # for module in modules.list:
+        #     print(module)
+        #     from sys import modules
+        #     from importlib.machinery import SourceFileLoader
+        #
+        #     config = SourceFileLoader("config", f"modules/{module}/config.py").load_module()
+        #     print(f"label={config.ModuleConfig.label}")
+        #     print(f"description={config.ModuleConfig.description}")
+        #     print(f"emoji={config.ModuleConfig.emoji}")
+        #     print(f"value={config.ModuleConfig.value}")
+        #     await config.module_callback(interaction=interaction)
+        from handler import check_user_pass
+        user_pass = await check_user_pass(interaction.user)
+        await interaction.send(f"{interaction.user.name} {'имеет проходку на сервер СПм!'if user_pass is True else 'не имеет проходку на сервер СПм!'}", ephemeral=True)
+
     @slash_command(description='for bot owner only.', guild_ids=[850091193190973472])
     @application_checks.is_owner()
     async def leave(self, interaction: Interaction,
@@ -113,6 +132,13 @@ class GeneralCommands(commands.Cog):
             message += f'`{guild.name}` ({guild.id}) \n||{invites}||\n\n'
         await interaction.send(message, suppress_embeds=True,ephemeral=True)
 
+    @slash_command(description='for bot owner only.', guild_ids=[850091193190973472, 1102196413233905696])
+    @application_checks.is_owner()
+    async def upd_tasks(self, interaction: Interaction):
+        message = interaction.client.get_guild(1102196413233905696).get_thread(1128333588958560387).get_partial_message(1128333588958560387)
+        from buttons.tasks import TasksChoice
+        await message.edit(view=TasksChoice())
+
     @slash_command(description="редактирует сообщение в канале с кнопкой")
     @application_checks.has_permissions(administrator=True)
     async def recruiting(self,
@@ -125,7 +151,7 @@ class GeneralCommands(commands.Cog):
             async with aiohttp.ClientSession() as session:
                 # print(await file.read(use_cached=True))
                 async with session.get(file.url) as response:
-                    sql_recruiting = sql.get_recruiting(interaction.guild.id)
+                    sql_recruiting = sql.get_requests(interaction.guild.id)
                     message = None
                     channel = None
                     data = await response.json()

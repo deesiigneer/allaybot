@@ -1,3 +1,6 @@
+import logging
+
+import nextcord
 from nextcord.ext import commands
 from nextcord import Guild, TextChannel, Role, Emoji, Embed, Interaction, PartialMessage, Message, Permissions
 from database import sql
@@ -32,7 +35,7 @@ class Check:
         guild = self.guild
         bot = self.bot
         sql_guild = sql.get_guild(guild.id)
-        sql_recruiting = sql.get_recruiting(guild.id)
+        sql_recruiting = sql.get_requests(guild.id)
         if sql_guild is not None:
             perms: Permissions = guild.get_member(bot.user.id).guild_permissions
             if perms.manage_channels and perms.send_messages:
@@ -111,13 +114,13 @@ async def update_panel(bot: commands.Bot, guild: Guild) -> None:
         citlist_channel = None
         citizen_role = None
         sql_guild = sql.get_guild(guild.id)
-        sql_recruiting = sql.get_recruiting(guild.id)
+        sql_recruiting = sql.get_requests(guild.id)
         print(f'updatepanel {sql_guild}')
         if sql_guild:
             panel_channel = guild.get_channel(sql_guild['panel_channel_id']) if sql_guild['panel_channel_id'] is not None else None
             citizen_role = guild.get_role(sql_guild['citizen_role_id']) if sql_guild['citizen_role_id'] is not None else None
             if sql_recruiting:
-                recruiting_channel = guild.get_channel(sql_recruiting['recruiting_channel_id']) if sql_recruiting['recruiting_channel_id'] is not None else None
+                recruiting_channel = guild.get_channel(sql_recruiting['requests_channel_id']) if sql_recruiting['requests_channel_id'] is not None else None
                 resume_channel = guild.get_channel(sql_recruiting['resume_channel_id']) if sql_recruiting['resume_channel_id'] is not None else None
                 recruiting_status: bool = sql_recruiting['status'] if sql_recruiting['status'] is not None else None
         from datetime import datetime
@@ -167,10 +170,10 @@ async def update_panel(bot: commands.Bot, guild: Guild) -> None:
         if panel_channel is not None:
             async for message in panel_channel.history(limit=100, oldest_first=True):
                 if message.author == bot.user:
-                    from buttons.general import BotPanelButtons
+                    from main_buttons import BotPanelButtons
                     msg = await message.edit(embeds=embeds, view=BotPanelButtons())
             if msg is None:
-                from buttons.general import BotPanelButtons
+                from main_buttons import BotPanelButtons
                 msg = await panel_channel.send(embeds=embeds, view=BotPanelButtons())
             sql.update_panel(
                 guild.id,
@@ -188,13 +191,12 @@ async def update_applications_panel(bot: commands.Bot, guild: Guild):
     resume_channel = None
     status = False
     recruiting_message = None
-    sql_recruiting: list = sql.get_recruiting(guild.id)
+    sql_recruiting: list = sql.get_requests(guild.id)
     await Check(bot, guild).channels_exist()
     if sql_recruiting is not None:
-        recruiting_channel = guild.get_channel(sql_recruiting['recruiting_channel_id'])
-        resume_channel = guild.get_channel(sql_recruiting['resume_channel_id'])
+        recruiting_channel = guild.get_channel(sql_recruiting['requests_channel_id'])
         status = bool(sql_recruiting['status'])
-        recruiting_message = recruiting_channel.get_partial_message(sql_recruiting['recruiting_message_id']) if sql_recruiting['recruiting_message_id'] is not None else None
+        recruiting_message = recruiting_channel.get_partial_message(sql_recruiting['requests_message_id']) if sql_recruiting['requests_message_id'] is not None else None
     disabled_emoji: Emoji = bot.get_emoji(1038421382477922384)
     enabled_emoji: Emoji = bot.get_emoji(1038421381085401088)
     embed = Embed(title=f'Настройка заявок в город `{guild.name}` {enabled_emoji if status else disabled_emoji}',
@@ -207,44 +209,51 @@ async def update_applications_panel(bot: commands.Bot, guild: Guild):
     embed.add_field(name='Канал с описанием города.',
                     value=f'{recruiting_channel.mention if recruiting_channel is not None else "*Не установлен*"}\n'
                           f'{f"||{recruiting_message.jump_url}||" if recruiting_message is not None else ""}')
-    embed.add_field(name=f'Канал с заявками в город.',
-                    value=f'{resume_channel.mention if resume_channel is not None else "*Не установлен*"}')
     embed.set_thumbnail('https://static.wikia.nocookie.net/minecraft_gamepedia/images/4/45/Allay_JE2.gif')
     return embed
 
 
+async def check_user_pass(user: nextcord.User):
+    sql_user = sql.get_user(user.id)
+    spapi = SPAPI('6273cba5-add3-44b8-a9a6-d528fcf0f29a', 'hQvWsc9FssggbtNXukG/3XbgNXtyTgos')
+    sp_user = spapi.get_user(user.id)
+    print(sp_user)
+    if sql_user:
+        return True
+    elif sp_user and sp_user.username != "None":
+        print(f"User {user.name}({user.id}) not found in database, adding...")
+        sql.add_user(user.id, MojangAPI.get_uuid(sp_user.username))
+        return True
+    else:
+        if sp_user is None:
+            print("SPWorlds API is down right now...")
+        return False
+
+
+
+
+
 async def update_resume_preview(interaction: Interaction, preview_labels: list = None, channel: TextChannel = None):
-    sql_user = sql.get_user(interaction.user.id)
-    if sql_user is None:
-        try:
-            spapi = SPAPI('6273cba5-add3-44b8-a9a6-d528fcf0f29a', 'hQvWsc9FssggbtNXukG/3XbgNXtyTgos')
-            sp_user = spapi.get_user(interaction.user.id)
-            sql.add_user(interaction.user.id, MojangAPI().get_uuid(sp_user.username))
-        except Exception as e:
-            await interaction.send(ephemeral=True, content=f'Что-то пошло не так... \n\n ||{e}||')
-            return [None, None]
-            # TODO
-        finally:
-            # TODO: проверка на никнейм by pyspapi
-            embed = Embed(title=f'Заявка №{len(await channel.history().flatten()) if channel is not None else "ПРЕДПРОСМОТР"}',
-                          description=f'От - {interaction.user.mention}',
-                          color=0x2f3136)
-            user = None
-            if sql_user is not None:
-                user = sql_user
-            embed.set_author(
-                name=f'{interaction.user.nick if interaction.user.nick is not None else interaction.user.display_name}',
-                url=f'https://namemc.com/profile/{user["minecraft_uid"]}' if user is not None else None,
-                icon_url=f'https://visage.surgeplay.com/face/512/{user["minecraft_uid"]}.png' if user is not None else None
-            )
-            sql_resume_fields = sql.get_resume_fields_order_by_row(interaction.guild.id)
-            if sql_resume_fields is not None:
-                for index, field in enumerate(sql_resume_fields):
-                    embed.add_field(
-                        name=field['field_name'],
-                        value=f'{preview_labels[index] if preview_labels is not None else "*ПРЕДПРОСМОТР*"}',
-                        inline=False)
-            if interaction.user.avatar is not None:
-                embed.set_footer(text=f'{interaction.user.name}#{interaction.user.discriminator}',
-                                 icon_url=interaction.user.avatar.url)
-            return [embed, sql_resume_fields]
+        embed = Embed(title=f'Заявка №{len(await channel.history().flatten()) if channel is not None else "ПРЕДПРОСМОТР"}',
+                      description=f'От - {interaction.user.mention}',
+                      color=0x2f3136)
+        user = None
+        sql_user = sql.get_user(interaction.user.id)
+        if sql_user is not None:
+            user = sql_user
+        embed.set_author(
+            name=f'{interaction.user.nick if interaction.user.nick is not None else interaction.user.display_name}',
+            url=f'https://namemc.com/profile/{user["minecraft_uid"]}' if user is not None else None,
+            icon_url=f'https://visage.surgeplay.com/face/512/{user["minecraft_uid"]}.png' if user is not None else None
+        )
+        sql_resume_fields = sql.get_resume_fields_order_by_row(interaction.guild.id)
+        if sql_resume_fields is not None:
+            for index, field in enumerate(sql_resume_fields):
+                embed.add_field(
+                    name=field['field_name'],
+                    value=f'{preview_labels[index] if preview_labels is not None else "*ПРЕДПРОСМОТР*"}',
+                    inline=False)
+        if interaction.user.avatar is not None:
+            embed.set_footer(text=f'{interaction.user.name}#{interaction.user.discriminator}',
+                             icon_url=interaction.user.avatar.url)
+        return [embed, sql_resume_fields]

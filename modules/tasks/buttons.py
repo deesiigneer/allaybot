@@ -32,7 +32,7 @@ class TasksModuleSetup(View):
         self.interaction = interaction if interaction is not None else None
         self.sql_recruiting = None
         if self.interaction is not None:
-            self.sql_recruiting = sql.get_recruiting(self.interaction.guild.id)
+            self.sql_recruiting = sql.get_requests(self.interaction.guild.id)
 
     @button(label='Установка модуля [Задания]', style=ButtonStyle.blurple, row=1, custom_id='tasks_installation')
     async def tasks_installation(self, btn: Button, interaction: Interaction):
@@ -440,11 +440,11 @@ class TaskChoiceSelect(Select):
             else:
                 await interaction.send(content='У вас нету прав :(', ephemeral=True)
         elif self.values[0] == 'my_tasks':
-            data: dict = sql.get_tasks_()
+            data: dict = sql.get_tasks_by_customer_id(interaction.user.id)
             for index, d in enumerate(data):
-                if not interaction.client.get_guild(d['guild_id']):
+                if not interaction.client.get_guild(d['customer_guild_id']):
                     del data[index]
-            pages = TasksListPages(source=TasksPages(list(data)))
+            pages = TasksPages(source=TasksListPages(list(data)))
             await pages.start(interaction=interaction, ephemeral=True)
         elif self.values[0] == 'im_doing':
             tasks = sql.get_tasks_by_customer_id(interaction.user.id)
@@ -596,8 +596,16 @@ class TasksListPages(menus.ListPageSource):
 
     async def format_page(self, menu, page):
         embed = nextcord.Embed(title="Entries")
-        for entry in page:
-            embed.add_field(name=entry[0], value=entry[1], inline=True)
+        embed.add_field(name='Заказчик', value=f"<@{page['customer_id']}>")
+        embed.add_field(name='Заказ', value=f"{page['item']}")
+        embed.add_field(name='Описание', value=f"{page['description']}")
+        embed.add_field(name='Цена', value=f"{page['price']}")
+        embed.add_field(name='Статус', value=f"{page['status']}")
+        embed.add_field(name='Исполнитель', value=f"<@{page['contactor_id']}>")
+        # for entry in page:
+        #     print(page['item'])
+        #     print(f'entry {entry}')
+        #     embed.add_field(name=entry, value=entry, inline=False)
         embed.set_footer(text=f'Page {menu.current_page + 1}/{self.get_max_pages()}')
         return embed
 
@@ -613,6 +621,8 @@ class TasksPages(menus.ButtonMenuPages, inherit_buttons=False):
         # self.add_item(Button(label='Перейти на сервер', emoji='➡️', style=ButtonStyle.url, row=0,
         #                      url=f'{}'))
         self._disable_unavailable_buttons()
+        # TODO скрытие кнопок когда это необходимо
+
 
     @button(label='Выполнено', custom_id='my_task_done', style=ButtonStyle.green, emoji='🟩', row=2)
     async def my_task_done(self, button: Button, interaction: Interaction):
@@ -622,12 +632,12 @@ class TasksPages(menus.ButtonMenuPages, inherit_buttons=False):
     async def new_task_edit(self, button: Button, interaction: Interaction):
         pass
 
-    @button(label='Удалить', custom_id='my_task_delete', style=ButtonStyle.gray, emoji='🌐', row=3)
-    async def new_task_global_status(self, button: Button, interaction: Interaction):
+    @button(label='Удалить', custom_id='my_task_delete', style=ButtonStyle.red, emoji='✖', row=3)
+    async def my_task_delete(self, button: Button, interaction: Interaction):
         pass
 
-    @button(label='Отказаться от исполнителя', custom_id='my_task_cancel_contactor', style=ButtonStyle.blurple, emoji='⬅️', row=4)
-    async def new_task_back(self, button: Button, interaction: Interaction):
+    @button(label='Отказаться от исполнителя', custom_id='my_task_cancel_contactor', style=ButtonStyle.blurple, emoji='😢', row=4)
+    async def my_task_cancel_contactor(self, button: Button, interaction: Interaction):
         pass
 
 
