@@ -444,7 +444,7 @@ class TaskChoiceSelect(Select):
             for index, d in enumerate(data):
                 if not interaction.client.get_guild(d['customer_guild_id']):
                     del data[index]
-            pages = TasksPages(source=TasksListPages(list(data)))
+            pages = TasksPages(source=TasksListPages(list(data)), user=interaction.user)
             await pages.start(interaction=interaction, ephemeral=True)
         elif self.values[0] == 'im_doing':
             tasks = sql.get_tasks_by_customer_id(interaction.user.id)
@@ -595,13 +595,21 @@ class TasksListPages(menus.ListPageSource):
         super().__init__(data, per_page=1)
 
     async def format_page(self, menu, page):
-        embed = nextcord.Embed(title="Entries")
-        embed.add_field(name='Заказчик', value=f"<@{page['customer_id']}>")
-        embed.add_field(name='Заказ', value=f"{page['item']}")
+        customer = sql.get_user(page['customer_id'])
+        contactor = sql.get_user(page['contactor_id']) if page['contactor_id'] is not None else None
+        from pyspapi import MojangAPI
+        embed = nextcord.Embed(title=f"Заказ #{page['task_id']} - {page['status']}",
+                               description=page['item'])
+        embed.set_author(name=MojangAPI.get_username(customer['minecraft_uid']),
+                         icon_url=f"https://visage.surgeplay.com/face/512/{customer['minecraft_uid']}.png")
         embed.add_field(name='Описание', value=f"{page['description']}")
         embed.add_field(name='Цена', value=f"{page['price']}")
-        embed.add_field(name='Статус', value=f"{page['status']}")
-        embed.add_field(name='Исполнитель', value=f"<@{page['contactor_id']}>")
+        if contactor:
+            contactor = f"{menu.bot.get_user(page['contactor_id']).mention} (`{MojangAPI.get_username(contactor['minecraft_uid'])}`)"
+        else:
+            contactor = 'Нету'
+        embed.add_field(name='Исполнитель',
+                        value=contactor)
         # for entry in page:
         #     print(page['item'])
         #     print(f'entry {entry}')
@@ -611,8 +619,9 @@ class TasksListPages(menus.ListPageSource):
 
 
 class TasksPages(menus.ButtonMenuPages, inherit_buttons=False):
-    def __init__(self, source, timeout=300):
+    def __init__(self, source, user:nextcord.User = None, timeout=300):
         super().__init__(source, timeout=timeout, disable_buttons_after=True)
+        self.user = user
         self.add_item(TasksSortBy())
         self.add_item(menus.MenuPaginationButton(emoji=self.FIRST_PAGE))
         self.add_item(menus.MenuPaginationButton(emoji=self.PREVIOUS_PAGE))
@@ -629,7 +638,7 @@ class TasksPages(menus.ButtonMenuPages, inherit_buttons=False):
         pass
 
     @button(label='Редактировать', custom_id='my_task_edit', style=ButtonStyle.gray, emoji='✏️', row=3)
-    async def new_task_edit(self, button: Button, interaction: Interaction):
+    async def my_task_edit(self, button: Button, interaction: Interaction):
         pass
 
     @button(label='Удалить', custom_id='my_task_delete', style=ButtonStyle.red, emoji='✖', row=3)
@@ -639,6 +648,89 @@ class TasksPages(menus.ButtonMenuPages, inherit_buttons=False):
     @button(label='Отказаться от исполнителя', custom_id='my_task_cancel_contactor', style=ButtonStyle.blurple, emoji='😢', row=4)
     async def my_task_cancel_contactor(self, button: Button, interaction: Interaction):
         pass
+
+    async def check_buttons(self, page) -> [bool, bool, bool, bool]:
+        order = sql.get_tasks_by_customer_id(self.user.id)[self.current_page]
+        if order['status'] == 'in-progress':
+            self.my_task_done.disabled = False
+            self.my_task_edit.disabled = True
+            self.my_task_delete.disabled = True
+            self.my_task_cancel_contactor.disabled = False
+        elif order['status'] == 'waiting':
+            self.my_task_done.disabled = True
+            self.my_task_edit.disabled = False
+            self.my_task_delete.disabled = False
+            self.my_task_cancel_contactor.disabled = True
+        elif order['status'] == 'done':
+            self.my_task_done.disabled = True
+            self.my_task_edit.disabled = True
+            self.my_task_delete.disabled = True
+            self.my_task_cancel_contactor.disabled = True
+        return self.my_task_done.disabled, self.my_task_edit.disabled, self.my_task_delete.disabled, self.my_task_cancel_contactor.disabled
+
+    async def go_to_first_page(self, payload=None):
+        print('go_to_first_page',self.current_page)
+        check = await self.check_buttons(0)
+        self.my_task_done.disabled = check[0]
+        self.my_task_edit.disabled = check[1]
+        self.my_task_delete.disabled = check[2]
+        self.my_task_cancel_contactor.disabled = check[3]
+        await self.show_page(0)
+
+    async def go_to_previous_page(self, payload=None):
+        print('go_to_previous_page',self.current_page)
+        print('00011',self.my_task_done.disabled)
+        print('00012',self.my_task_edit.disabled)
+        print('00013',self.my_task_delete.disabled)
+        print('00014',self.my_task_cancel_contactor.disabled)
+        if self.current_page >= 0:
+            print('gtpp+')
+            check = await self.check_buttons(self.current_page - 1)
+            print(check)
+            self.my_task_done.disabled = check[0]
+            self.my_task_edit.disabled = check[1]
+            self.my_task_delete.disabled = check[2]
+            self.my_task_cancel_contactor.disabled = check[3]
+            # print('00012',self.accept_button.disabled)
+        await self.show_page(self.current_page - 1)
+        print('00023',self.my_task_done.disabled)
+        print('00024',self.my_task_edit.disabled)
+        print('00025',self.my_task_delete.disabled)
+        print('00026',self.my_task_cancel_contactor.disabled)
+        # print('00013',self.accept_button.disabled)
+
+    async def go_to_next_page(self, payload=None):
+        print('go_to_next_page',self.current_page)
+        print('00015',self.my_task_done.disabled)
+        print('00016',self.my_task_edit.disabled)
+        print('00017',self.my_task_delete.disabled)
+        print('00018',self.my_task_cancel_contactor.disabled)
+        if self.current_page != self.source.get_max_pages():
+            print('gtnp+')
+            check = await self.check_buttons(self.current_page + 1)
+            print(check)
+            self.my_task_done.disabled = check[0]
+            self.my_task_edit.disabled = check[1]
+            self.my_task_delete.disabled = check[2]
+            self.my_task_cancel_contactor.disabled = check[3]
+        print('00019',self.my_task_done.disabled)
+        print('00020',self.my_task_edit.disabled)
+        print('00021',self.my_task_delete.disabled)
+        print('00022',self.my_task_cancel_contactor.disabled)
+        await self.show_page(self.current_page + 1)
+
+    async def go_to_last_page(self, payload=None):
+        print('go_to_first_page',self.current_page)
+        check = await self.check_buttons(self._source.get_max_pages() - 1)
+        self.my_task_done.disabled = check[0]
+        self.my_task_edit.disabled = check[1]
+        self.my_task_delete.disabled = check[2]
+        self.my_task_cancel_contactor.disabled = check[3]
+        await self.show_page(self._source.get_max_pages() - 1)
+
+    async def interaction_check(self, interaction: Interaction) -> bool:
+        await self.check_buttons(0)
+        return self.user.id == interaction.user.id
 
 
 class ImDoing(View):
