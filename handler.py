@@ -121,7 +121,6 @@ async def update_panel(bot: commands.Bot, guild: Guild) -> None:
             citizen_role = guild.get_role(sql_guild['citizen_role_id']) if sql_guild['citizen_role_id'] is not None else None
             if sql_recruiting:
                 recruiting_channel = guild.get_channel(sql_recruiting['requests_channel_id']) if sql_recruiting['requests_channel_id'] is not None else None
-                resume_channel = guild.get_channel(sql_recruiting['resume_channel_id']) if sql_recruiting['resume_channel_id'] is not None else None
                 recruiting_status: bool = sql_recruiting['status'] if sql_recruiting['status'] is not None else None
         from datetime import datetime
         subscription = datetime.combine(sql_guild['subscription_expires'], datetime.min.time()) if sql_guild['subscription_expires'] is not None else None
@@ -133,14 +132,14 @@ async def update_panel(bot: commands.Bot, guild: Guild) -> None:
                          icon_url=bot.user.avatar.url,
                          url='https://discord.gg/VbyHaKRAaN')
         # https://img.icons8.com/color/48/null/dashboard-layout.png
-        if subscription is not None:
-            sub = subscription.isoformat()
-            now = datetime.utcnow().isoformat()
-            embed.set_footer(text=f'Премиум подписка {"активна до" if sub > now else "истекла"}',
-                             icon_url='https://static.wikia.nocookie.net/minecraft_gamepedia/images/4/45/Allay_JE2.gif')
-        else:
-            embed.set_footer(text=f'Нету активной премиум подписки',
-                             icon_url='https://static.wikia.nocookie.net/minecraft_gamepedia/images/4/45/Allay_JE2.gif')
+        # if subscription is not None:
+        #     sub = subscription.isoformat()
+        #     now = datetime.utcnow().isoformat()
+        #     embed.set_footer(text=f'Премиум подписка {"активна до" if sub > now else "истекла"}',
+        #                      icon_url='https://static.wikia.nocookie.net/minecraft_gamepedia/images/4/45/Allay_JE2.gif')
+        # else:
+        #     embed.set_footer(text=f'Нету активной премиум подписки',
+        #                      icon_url='https://static.wikia.nocookie.net/minecraft_gamepedia/images/4/45/Allay_JE2.gif')
         if citizen_role is None:
             embed.description = f"**Роль жителя не установлена.**"
         if citizen_role is not None:
@@ -151,11 +150,10 @@ async def update_panel(bot: commands.Bot, guild: Guild) -> None:
         disabled_emoji: Emoji = bot.get_emoji(1038421382477922384)
         enabled_emoji: Emoji = bot.get_emoji(1038421381085401088)
         print('recruiting_status', recruiting_status)
-        embed.add_field(
-            name=f'Набор в город {guild.name} {disabled_emoji if recruiting_status is False else enabled_emoji}',
-            value=f'{recruiting_channel.mention if recruiting_channel is not None else "*Не установлено*"}\n'
-                  f'{resume_channel.mention if resume_channel is not None else ""} ',
-            inline=False)
+        # embed.add_field(
+        #     name=f'v',
+        #     value=f'{recruiting_channel.mention if recruiting_channel is not None else "*Не установлено*"}\n',
+        #     inline=False)
 
         # if citlist_channel is None:
         #     emoji: Emoji = bot.get_emoji(1038421382477922384)
@@ -188,27 +186,37 @@ async def update_panel(bot: commands.Bot, guild: Guild) -> None:
 
 async def update_applications_panel(bot: commands.Bot, guild: Guild):
     recruiting_channel = None
-    resume_channel = None
-    status = False
     recruiting_message = None
-    sql_recruiting: list = sql.get_requests(guild.id)
+    status = False
+    private = False
+    sql_requests = sql.get_requests(guild.id)
+    sql_guild = sql.get_guild(guild.id)
     await Check(bot, guild).channels_exist()
-    if sql_recruiting is not None:
-        recruiting_channel = guild.get_channel(sql_recruiting['requests_channel_id'])
-        status = bool(sql_recruiting['status'])
-        recruiting_message = recruiting_channel.get_partial_message(sql_recruiting['requests_message_id']) if sql_recruiting['requests_message_id'] is not None else None
+    if sql_requests is not None:
+        recruiting_channel = guild.get_channel(sql_requests['requests_channel_id'])
+        status = sql_requests['status']
+        private = sql_requests['private']
+        recruiting_message = recruiting_channel.get_partial_message(
+            sql_requests['requests_message_id']).jump_url if sql_requests['requests_channel_id'] is not None else '**Не установлен**'
     disabled_emoji: Emoji = bot.get_emoji(1038421382477922384)
     enabled_emoji: Emoji = bot.get_emoji(1038421381085401088)
     embed = Embed(title=f'Настройка заявок в город `{guild.name}` {enabled_emoji if status else disabled_emoji}',
-                  description=f'**Используйте команду** *`/recruiting`* - для редактирования текста в канала '
-                              f'с описанием города и кнопкой\n'
-                              f'||Можете воспользоваться созданием файла вебхука [тут](https://discohook.org/)||\n\n'
-                              f'**Используйте команду** *`/resume`* - для редактирования изменения с заявками '
-                              f'в город\n\n',
+                  description=f'**```description```**',
                   color=0x2f3136)
-    embed.add_field(name='Канал с описанием города.',
-                    value=f'{recruiting_channel.mention if recruiting_channel is not None else "*Не установлен*"}\n'
-                          f'{f"||{recruiting_message.jump_url}||" if recruiting_message is not None else ""}')
+    # todo проверка на валидный инвайт
+    embed.add_field(
+        name='Канал с кнопкой и описанием города.',
+        value=f'{f"{recruiting_message}" if recruiting_message is not None else "*Не установлен*"}')
+    embed.add_field(inline=False,
+        name='**[НЕ УДАЛЯТЬ]** Ссылка приглашение.',
+        value=f'https://discord.gg/{sql_guild["invite"]}\n\n'
+              f'**Если удалить инвайт - к вам в город не смогут попасть новые люди!**' if sql_guild["invite"] is not None else "**Не установлено**")
+    embed.add_field(inline=False,
+        name='Статус набора',
+        value=f"{'В процессе' if status is True else 'Приостановлен'}")
+    embed.add_field(inline=False,
+        name='**[in dev]** Видимость/приватность заявок',
+        value=f"{'Открытые' if private is False else 'Закрытые'}")
     embed.set_thumbnail('https://static.wikia.nocookie.net/minecraft_gamepedia/images/4/45/Allay_JE2.gif')
     return embed
 
@@ -230,7 +238,20 @@ async def check_user_pass(user: nextcord.User):
         return False
 
 
-
+async def check_permissions(interaction: Interaction, **perms: bool):
+    invalid = set(perms) - set(nextcord.Permissions.VALID_FLAGS)
+    if invalid:
+        raise TypeError(f"Invalid permission(s): {', '.join(invalid)}")
+    permissions = interaction.guild.me.guild_permissions
+    missing = [perm for perm, value in perms.items() if getattr(permissions, perm) != value]
+    if not missing:
+        return True
+    else:
+        s = ''
+        for x in missing:
+            print(x)
+            s = s + x + '\n' if s.startswith('') else s + x
+        await interaction.send(f'Требуются следующие разрешения:\n\n{s}', ephemeral=True)
 
 
 async def update_resume_preview(interaction: Interaction, preview_labels: list = None, channel: TextChannel = None):

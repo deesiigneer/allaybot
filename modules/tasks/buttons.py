@@ -4,7 +4,7 @@ from nextcord.utils import find
 from nextcord import ButtonStyle, Interaction, Embed, Role, Emoji, PermissionOverwrite, Guild, SelectOption, \
     TextChannel, TextInputStyle, ChannelType, ForumTag, SortOrderType, Client, ForumChannel, Thread
 from database import sql
-from nextcord.ext import menus
+from nextcord.ext import menus, application_checks
 from sys import exc_info
 
 
@@ -79,7 +79,13 @@ class TasksModuleSetup(View):
                         available_tags=forum_tags,
                         default_reaction='🔨',
                         default_sort_order=SortOrderType.creation_date)
-                    embed = Embed(title='test title', description='test description') # TODO
+                    embed = Embed(title='Оформление заданий') # TODO
+                    embed.add_field(name='Новая задача.',
+                                    value='Создание задачи')
+                    embed.add_field(name='Мои задачи.',
+                                    value='Задачи созданные вами')
+                    embed.add_field(name='Я выполняю.',
+                                    value='Задачи выполняемые вами')
                     thread = await tasks_channel.create_thread(name='🖌️Оформление заданий', embed=embed,
                                                                view=TasksChoice())
                     flgs = nextcord.ChannelFlags()
@@ -137,8 +143,8 @@ class TasksConfig(View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    @button(label='Настройка глобальных заказов', emoji='👋', style=ButtonStyle.green, row=1, custom_id='task_accept')
-    async def task_accept(self, button: Button, interaction: Interaction):
+    @button(label='[in dev] settings', emoji='⚒', style=ButtonStyle.gray, row=1, custom_id='tasks_config', disabled=True)
+    async def tasks_config(self, button: Button, interaction: Interaction):
         pass
 
 
@@ -150,11 +156,11 @@ class TasksAccept(View):
 
     @button(label='Принять', emoji='👋', style=ButtonStyle.green, row=1, custom_id=f'task_accept')
     async def task_accept(self, button: Button, interaction: Interaction):
-        task_id = None
         embed = None
         for embed in interaction.message.embeds:
             task_id = f'{interaction.channel.name.split("#")[1].split(" ")[0]}'
-        sql_task = sql.get_task_by_task_id(int(task_id)+1)
+        print(f'thread_id = {interaction.message.thread.id}')
+        sql_task = sql.get_tasks_by_thread_id(interaction.message.thread.id)
         print(sql_task)
         if sql_task:
             customer_guild = interaction.client.get_guild(sql_task['customer_guild_id'])
@@ -166,7 +172,7 @@ class TasksAccept(View):
             for _embed in interaction.message.embeds:
                 _embed: Embed = _embed
             user = interaction.user
-            await interaction.send(f'{user.mention}, ты принял заказ #{task_id}!', ephemeral=True)
+            await interaction.send(f"{user.mention}, ты принял заказ #{sql_task['task_id']}!", ephemeral=True)
             user = sql.get_user(interaction.user.id)
             from pyspapi import SPAPI, MojangAPI
             if user:
@@ -205,7 +211,8 @@ class TasksAccept(View):
                 guild = interaction.client.get_guild(sql_guild['guild_id'])
                 for thread in guild.threads:
                     # TODO: check solo task
-                    if thread.name.startswith(f"🌐 #{task_id} {sql_task['item']}"):
+                    print(f"#{sql_task['task_id']} {sql_task['item']}")
+                    if thread.name.startswith(f"🌐 #{sql_task['task_id']} {sql_task['item']}"):
                         print('th name',thread.name)
                         forum_tags = [ForumTag(name='Глобальный', id=sql_guild['task_tag_global_id']),
                             ForumTag(name='Ожидают', id=sql_guild['task_tag_in_progress_id'])]
@@ -219,7 +226,7 @@ class TasksAccept(View):
                                 button.disabled = True
                                 print(button.disabled)
                                 await message.edit(embed=_embed, view=self)
-                    elif thread.name.startswith(f"#{task_id} {sql_task['item']}"):
+                    elif thread.name.startswith(f"#{sql_task['task_id']-1} {sql_task['item']}"):
                         thread = interaction.channel
                         print('solo')
                         forum_tags = [ForumTag(name='Ожидают', id=sql_guild['task_tag_in_progress_id'])]
@@ -248,7 +255,7 @@ class TasksDone(View):
         embed = None
         for embed in interaction.message.embeds:
             task_id = f'{interaction.channel.name.split("#")[1].split(" ")[0]}'
-        sql_task = sql.get_task_by_task_id(int(task_id)+1)
+        sql_task = sql.get_task_by_task_id(int(task_id))
         print(sql_task)
         if sql_task:
             customer_guild = interaction.client.get_guild(sql_task['customer_guild_id'])
@@ -402,9 +409,9 @@ class TaskChoiceSelect(Select):
                          disabled=False)
 
     async def callback(self, interaction: Interaction):  # TODO: check available list of roles from db to interaction
+        await interaction.edit(view=TasksChoice())
         if self.values[0] == 'new_task':
             if interaction.user.guild_permissions.administrator is True:
-                await interaction.edit(view=TasksChoice())
                 embed = Embed(title='Новая задача', description='Описание')
                 embed.set_footer(text='Заказ ещё не принят...',
                                  icon_url='https://static.wikia.nocookie.net/'
@@ -441,15 +448,24 @@ class TaskChoiceSelect(Select):
                 await interaction.send(content='У вас нету прав :(', ephemeral=True)
         elif self.values[0] == 'my_tasks':
             data: dict = sql.get_tasks_by_customer_id(interaction.user.id)
-            for index, d in enumerate(data):
-                if not interaction.client.get_guild(d['customer_guild_id']):
-                    del data[index]
-            pages = TasksPages(source=TasksListPages(list(data)), user=interaction.user)
-            await pages.start(interaction=interaction, ephemeral=True)
+            if data:
+                for index, d in enumerate(data):
+                    if not interaction.client.get_guild(d['customer_guild_id']):
+                        del data[index]
+                pages = TasksPages(source=TasksListPages(list(data)), user=interaction.user)
+                await pages.start(interaction=interaction, ephemeral=True)
+            else:
+                await interaction.send('У вас нету заданий.', ephemeral=True)
         elif self.values[0] == 'im_doing':
-            tasks = sql.get_tasks_by_customer_id(interaction.user.id)
-            embed = Embed(title='Удаление задачи', description='Описание')
-            await interaction.send(embed=embed, ephemeral=True)
+            data: dict = sql.get_tasks_by_contactor_id(interaction.user.id)
+            if data:
+                for index, d in enumerate(data):
+                    if not interaction.client.get_guild(d['contactor_guild_id']):
+                        del data[index]
+                pages = ImDoingMenuPages(source=ImDoingListPages(list(data)), user=interaction.user)
+                await pages.start(interaction=interaction, ephemeral=True)
+            else:
+                await interaction.send('У вас нету заданий.', ephemeral=True)
 
 
 class NewTask(View):
@@ -480,7 +496,6 @@ class NewTask(View):
                         self.new_task_send.disabled = True
                         self.new_task_edit.disabled = True
                         self.new_task_global_status.disabled = True
-                        self.new_task_back.disabled = True
                         await interaction.edit(view=self)
                         waiting = await interaction.send(ephemeral=True, content='Необходимо подождать...')
                         sql_guilds = sql.get_guilds_where_tasks_enabled()
@@ -493,7 +508,7 @@ class NewTask(View):
                                 guild: Guild = interaction.client.get_guild(sql_guild['guild_id'])
                                 print('guild is', guild)
                                 channel = guild.get_channel(sql_guild['task_channel_id'])
-                                thread_ = await channel.create_thread(name=f'{is_global+" "}#{sql_count_tasks["max"]}'
+                                thread_ = await channel.create_thread(name=f'{is_global+" "}#{sql_count_tasks["last_value"]+1}'
                                                                           f' {item} - {interaction.user.display_name}',
                                                                      embed=embed)
                                 forum_tags = [ForumTag(name='Глобальные заказы', id=sql_guild['task_tag_global_id']),
@@ -512,7 +527,7 @@ class NewTask(View):
                             print('1')
                             sql_guild = sql.get_guild(interaction.guild.id)
                             channel = interaction.guild.get_channel(sql_guild['task_channel_id'])
-                            thread = await channel.create_thread(name=f'{is_global+" "}#{sql_count_tasks["max"]}'
+                            thread = await channel.create_thread(name=f'{is_global+" "}#{0 if sql_count_tasks["last_value"] is None else sql_count_tasks["last_value"]}'
                                                                       f' {item} - {interaction.user.display_name}',
                                                                  embed=embed)
                             forum_tags = [ForumTag(name='Ожидают', id=sql_guild['task_tag_waiting_id'])]
@@ -538,22 +553,24 @@ class NewTask(View):
                                                    'Попробуйте ещё раз.', ephemeral=True)
         # TODO: публикация на других серверах
 
-    @button(label='Отредактировать', custom_id='edit_new_task', style=ButtonStyle.gray, emoji='✏️', row=1)
+    @button(label='Отредактировать', custom_id='edit_new_task', style=ButtonStyle.blurple, emoji='✏️', row=1)
     async def new_task_edit(self, button: Button, interaction: Interaction):
         await interaction.response.send_modal(NewTaskModal(interaction))
 
-    @button(label='Глобальное задание', custom_id='new_task_global_status', style=ButtonStyle.gray, emoji='🌐', row=1)
+    @button(label='[in dev] Глобальное задание', custom_id='new_task_global_status',
+            style=ButtonStyle.gray, emoji='🌐', row=2, disabled=True)
     async def new_task_global_status(self, button: Button, interaction: Interaction):
-        for embed in interaction.message.embeds:
-            if embed.title.endswith('🌐'):
-                embed.title = embed.title.split(' 🌐', 1)[0]
-            else:
-                embed.title = f'{embed.title} 🌐'
-            await interaction.edit(embed=embed)
+        await interaction.send(ephemeral=True, content='in dev...')
+        # for embed in interaction.message.embeds:
+        #     if embed.title.endswith('🌐'):
+        #         embed.title = embed.title.split(' 🌐', 1)[0]
+        #     else:
+        #         embed.title = f'{embed.title} 🌐'
+        #     await interaction.edit(embed=embed)
 
-    @button(label='Назад', custom_id='new_task_back', style=ButtonStyle.blurple, emoji='⬅️', row=2)
-    async def new_task_back(self, button: Button, interaction: Interaction):
-        pass
+    # @button(label='Назад', custom_id='new_task_back', style=ButtonStyle.blurple, emoji='⬅️', row=2)
+    # async def new_task_back(self, button: Button, interaction: Interaction):
+    #     pass
 
 
 class TasksSortBy(Select):
@@ -592,13 +609,17 @@ class TasksSortBy(Select):
 
 class TasksListPages(menus.ListPageSource):
     def __init__(self, data):
+        print(f'data = {data}')
         super().__init__(data, per_page=1)
 
     async def format_page(self, menu, page):
+        print(f'menu {menu}')
+        print(page)
+        print(type(page))
         customer = sql.get_user(page['customer_id'])
         contactor = sql.get_user(page['contactor_id']) if page['contactor_id'] is not None else None
         from pyspapi import MojangAPI
-        embed = nextcord.Embed(title=f"Заказ #{page['task_id']} - {page['status']}",
+        embed = nextcord.Embed(title=f"Задание   #{page['task_id']} - {page['status']}",
                                description=page['item'])
         embed.set_author(name=MojangAPI.get_username(customer['minecraft_uid']),
                          icon_url=f"https://visage.surgeplay.com/face/512/{customer['minecraft_uid']}.png")
@@ -614,43 +635,56 @@ class TasksListPages(menus.ListPageSource):
         #     print(page['item'])
         #     print(f'entry {entry}')
         #     embed.add_field(name=entry, value=entry, inline=False)
-        embed.set_footer(text=f'Page {menu.current_page + 1}/{self.get_max_pages()}')
+        embed.set_footer(text=f'Страница {menu.current_page + 1}/{self.get_max_pages()}')
         return embed
+
+    async def is_paginating(self) -> bool:
+        return True
 
 
 class TasksPages(menus.ButtonMenuPages, inherit_buttons=False):
     def __init__(self, source, user:nextcord.User = None, timeout=300):
         super().__init__(source, timeout=timeout, disable_buttons_after=True)
         self.user = user
-        self.add_item(TasksSortBy())
+        # self.add_item(TasksSortBy())
         self.add_item(menus.MenuPaginationButton(emoji=self.FIRST_PAGE))
         self.add_item(menus.MenuPaginationButton(emoji=self.PREVIOUS_PAGE))
         self.add_item(menus.MenuPaginationButton(emoji=self.NEXT_PAGE))
         self.add_item(menus.MenuPaginationButton(emoji=self.LAST_PAGE))
+        # if self._source.get_max_pages() < 2:
+        #     self.add_item(menus.MenuPaginationButton(emoji=self.FIRST_PAGE))
+        #     self.add_item(menus.MenuPaginationButton(emoji=self.PREVIOUS_PAGE))
+        #     self.add_item(menus.MenuPaginationButton(emoji=self.NEXT_PAGE))
+        #     self.add_item(menus.MenuPaginationButton(emoji=self.LAST_PAGE))
+        # else:
+        #     print('2')
         # self.add_item(Button(label='Перейти на сервер', emoji='➡️', style=ButtonStyle.url, row=0,
         #                      url=f'{}'))
         self._disable_unavailable_buttons()
-        # TODO скрытие кнопок когда это необходимо
+        self.order = sql.get_tasks_by_customer_id(self.user.id)[self.current_page]
+        if self.order['status'] == 'in-progress':
+            self.my_task_done.disabled = False
+            self.my_task_edit.disabled = True
+            self.my_task_delete.disabled = True
+            self.my_task_cancel_contactor.disabled = False
+        elif self.order['status'] == 'waiting':
+            self.my_task_done.disabled = True
+            self.my_task_edit.disabled = False
+            self.my_task_delete.disabled = False
+            self.my_task_cancel_contactor.disabled = True
+        elif self.order['status'] == 'done':
+            self.my_task_done.disabled = True
+            self.my_task_edit.disabled = True
+            self.my_task_delete.disabled = True
+            self.my_task_cancel_contactor.disabled = True
 
-
-    @button(label='Выполнено', custom_id='my_task_done', style=ButtonStyle.green, emoji='🟩', row=2)
-    async def my_task_done(self, button: Button, interaction: Interaction):
-        pass
-
-    @button(label='Редактировать', custom_id='my_task_edit', style=ButtonStyle.gray, emoji='✏️', row=3)
-    async def my_task_edit(self, button: Button, interaction: Interaction):
-        pass
-
-    @button(label='Удалить', custom_id='my_task_delete', style=ButtonStyle.red, emoji='✖', row=3)
-    async def my_task_delete(self, button: Button, interaction: Interaction):
-        pass
-
-    @button(label='Отказаться от исполнителя', custom_id='my_task_cancel_contactor', style=ButtonStyle.blurple, emoji='😢', row=4)
-    async def my_task_cancel_contactor(self, button: Button, interaction: Interaction):
-        pass
+    async def interaction_check(self, interaction: Interaction) -> bool:
+        await self.check_buttons(0)
+        return self.user.id == interaction.user.id
 
     async def check_buttons(self, page) -> [bool, bool, bool, bool]:
-        order = sql.get_tasks_by_customer_id(self.user.id)[self.current_page]
+        order = sql.get_tasks_by_customer_id(self.user.id)[page]
+        print(f'order = {order}')
         if order['status'] == 'in-progress':
             self.my_task_done.disabled = False
             self.my_task_edit.disabled = True
@@ -667,6 +701,53 @@ class TasksPages(menus.ButtonMenuPages, inherit_buttons=False):
             self.my_task_delete.disabled = True
             self.my_task_cancel_contactor.disabled = True
         return self.my_task_done.disabled, self.my_task_edit.disabled, self.my_task_delete.disabled, self.my_task_cancel_contactor.disabled
+
+
+    @button(label='Выполнено', custom_id='my_task_done', style=ButtonStyle.green, emoji='🟩', row=1)
+    async def my_task_done(self, button: Button, interaction: Interaction):
+        sql_task = sql.get_tasks_by_customer_id(self.user.id)[self.current_page]
+        sql_guild = sql.get_guild(interaction.guild.id)
+        contactor_thread = interaction.guild.get_thread(sql_task['contactor_thread_id'])
+        forum_tags = [ForumTag(name='Выполненные', id=sql_guild['task_tag_complete_id'])]
+        await contactor_thread.edit(applied_tags=forum_tags)
+        sql.task_done(sql_task['task_id'])
+        await interaction.send('Вы завершили свой заказ.', ephemeral=True)
+        contactor = interaction.client.get_user(sql_task['contactor_id'])
+        await interaction.client.get_channel(sql_task['contactor_thread_id']).send(f"{contactor.mention}, {interaction.user.mention} подтвердил выполнения задания!")
+        self.stop()
+    @button(label='Редактировать', custom_id='my_task_edit', style=ButtonStyle.gray, emoji='✏️', row=2)
+    async def my_task_edit(self, button: Button, interaction: Interaction):
+        print(f"edit = {sql.get_tasks_by_customer_id(self.user.id)[self.current_page]['task_id']}")
+        pass
+
+    @button(label='Удалить', custom_id='my_task_delete', style=ButtonStyle.red, emoji='✖', row=2)
+    async def my_task_delete(self, button: Button, interaction: Interaction):
+        sql_task = sql.get_tasks_by_customer_id(interaction.user.id)[self.current_page]
+        print(f'task = {sql_task}')
+        print(f"task = {sql_task['customer_thread_id']}")
+        contactor_thread = interaction.client.get_guild(sql_task['customer_guild_id']).get_channel_or_thread(sql_task['customer_thread_id'])
+        print(contactor_thread)
+        await contactor_thread.delete()
+        sql.delete_task(sql_task['task_id'])
+        await interaction.send('Вы удалили свой заказ.', ephemeral=True)
+        self.stop()
+
+    @button(label='Отказаться от исполнителя', custom_id='my_task_cancel_contactor', style=ButtonStyle.gray, emoji='😢', row=3)
+    async def my_task_cancel_contactor(self, button: Button, interaction: Interaction):
+        sql_task = sql.get_tasks_by_customer_id(self.user.id)[self.current_page]
+        sql_guild = sql.get_guild(interaction.guild.id)
+        contactor_thread = interaction.guild.get_thread(sql_task['contactor_thread_id'])
+        forum_tags = [ForumTag(name='Ожидают', id=sql_guild['task_tag_waiting_id'])]
+        await contactor_thread.edit(applied_tags=forum_tags)
+        contactor_thread_message = contactor_thread.get_partial_message(sql_task['contactor_thread_message_id'])
+        await contactor_thread_message.edit(view=TasksAccept())
+        sql.remove_contactor(sql_task['task_id'])
+        await interaction.send('Вы отказались от исполнителя.', ephemeral=True)
+        self.stop()
+
+    @button(label='[in dev] Поиск по номеру задания', custom_id='search_by_task_id', style=ButtonStyle.blurple, emoji='🔍', row=4, disabled=True)
+    async def search_by_task_id(self, button: Button, interaction: Interaction):
+        await interaction.response.send_modal(SearchByTaskID(interaction, True))
 
     async def go_to_first_page(self, payload=None):
         print('go_to_first_page',self.current_page)
@@ -728,9 +809,145 @@ class TasksPages(menus.ButtonMenuPages, inherit_buttons=False):
         self.my_task_cancel_contactor.disabled = check[3]
         await self.show_page(self._source.get_max_pages() - 1)
 
+
+class ImDoingListPages(menus.ListPageSource):
+    def __init__(self, data):
+        print(f'data = {data}')
+        super().__init__(data, per_page=1)
+
+    async def format_page(self, menu, page):
+        print(f'menu {menu}')
+        print(page)
+        print(type(page))
+        customer = sql.get_user(page['customer_id'])
+        contactor = sql.get_user(page['contactor_id']) if page['contactor_id'] is not None else None
+        from pyspapi import MojangAPI
+        embed = nextcord.Embed(title=f"Задание   #{page['task_id']} - {page['status']}",
+                               description=page['item'])
+        embed.set_author(name=MojangAPI.get_username(customer['minecraft_uid']),
+                         icon_url=f"https://visage.surgeplay.com/face/512/{customer['minecraft_uid']}.png")
+        embed.add_field(name='Описание', value=f"{page['description']}")
+        embed.add_field(name='Цена', value=f"{page['price']}")
+        if contactor:
+            contactor = f"{menu.bot.get_user(page['contactor_id']).mention} (`{MojangAPI.get_username(contactor['minecraft_uid'])}`)"
+        else:
+            contactor = 'Нету'
+        embed.add_field(name='Исполнитель',
+                        value=contactor)
+        # for entry in page:
+        #     print(page['item'])
+        #     print(f'entry {entry}')
+        #     embed.add_field(name=entry, value=entry, inline=False)
+        embed.set_footer(text=f'Страница {menu.current_page + 1}/{self.get_max_pages()}')
+        return embed
+
+    async def is_paginating(self) -> bool:
+        return True
+
+
+class ImDoingMenuPages(menus.ButtonMenuPages, inherit_buttons=False):
+    def __init__(self, source, user:nextcord.User = None, timeout=300):
+        super().__init__(source, timeout=timeout, disable_buttons_after=True)
+        self.user = user
+        # self.add_item(TasksSortBy())
+        self.add_item(menus.MenuPaginationButton(emoji=self.FIRST_PAGE))
+        self.add_item(menus.MenuPaginationButton(emoji=self.PREVIOUS_PAGE))
+        self.add_item(menus.MenuPaginationButton(emoji=self.NEXT_PAGE))
+        self.add_item(menus.MenuPaginationButton(emoji=self.LAST_PAGE))
+        # if self._source.get_max_pages() < 2:
+        #     self.add_item(menus.MenuPaginationButton(emoji=self.FIRST_PAGE))
+        #     self.add_item(menus.MenuPaginationButton(emoji=self.PREVIOUS_PAGE))
+        #     self.add_item(menus.MenuPaginationButton(emoji=self.NEXT_PAGE))
+        #     self.add_item(menus.MenuPaginationButton(emoji=self.LAST_PAGE))
+        # else:
+        #     print('2')
+        # self.add_item(Button(label='Перейти на сервер', emoji='➡️', style=ButtonStyle.url, row=0,
+        #                      url=f'{}'))
+        self._disable_unavailable_buttons()
+        self.order = sql.get_tasks_by_customer_id(self.user.id)[self.current_page]
+        if self.order['status'] == 'in-progress':
+            self.im_doing_done.disabled = False
+            self.im_doing_cancel.disabled = False
+        elif self.order['status'] == 'done':
+            self.im_doing_done.disabled = True
+            self.im_doing_cancel.disabled = True
+
     async def interaction_check(self, interaction: Interaction) -> bool:
         await self.check_buttons(0)
         return self.user.id == interaction.user.id
+
+    async def check_buttons(self, page) -> [bool, bool, bool, bool]:
+        order = sql.get_tasks_by_customer_id(self.user.id)[page]
+        print(f'order = {order}')
+        if order['status'] == 'in-progress':
+            self.im_doing_done.disabled = False
+            self.im_doing_cancel.disabled = False
+        elif order['status'] == 'done':
+            self.im_doing_done.disabled = True
+            self.im_doing_cancel.disabled = True
+        return self.im_doing_cancel.disabled, self.im_doing_done.disabled
+
+    @button(label='Я выполнил', custom_id='my_task_done', style=ButtonStyle.green, emoji='🟩', row=1)
+    async def im_doing_done(self, button: Button, interaction: Interaction):
+        sql_task = sql.get_tasks_by_customer_id(self.user.id)[self.current_page]
+        customer = interaction.client.get_user(sql_task['customer_id'])
+        await interaction.send(f"Ожидаем подтверждение от {customer.mention}...",
+                               ephemeral=True)
+        await interaction.client.get_channel(sql_task['customer_thread_id']).send(f"{customer.mention}, {interaction.user.mention} выполнил задание, подтвердите через оформление заданий...")
+        self.stop()
+
+    @button(label='Отказаться', custom_id='my_task_cancel_contactor', style=ButtonStyle.gray, emoji='😢', row=3)
+    async def im_doing_cancel(self, button: Button, interaction: Interaction):
+        sql_task = sql.get_tasks_by_customer_id(self.user.id)[self.current_page]
+        sql_guild = sql.get_guild(interaction.guild.id)
+        contactor_thread = interaction.guild.get_thread(sql_task['contactor_thread_id'])
+        forum_tags = [ForumTag(name='Ожидают', id=sql_guild['task_tag_waiting_id'])]
+        await contactor_thread.edit(applied_tags=forum_tags)
+        contactor_thread_message = contactor_thread.get_partial_message(sql_task['contactor_thread_message_id'])
+        await contactor_thread_message.edit(view=TasksAccept())
+        sql.remove_contactor(sql_task['task_id'])
+        await interaction.send('Вы отказались от исполнителя.', ephemeral=True)
+        self.stop()
+
+    @button(label='[in dev] Поиск по номеру задания', custom_id='search_by_task_id', style=ButtonStyle.blurple, emoji='🔍', row=4, disabled=True)
+    async def search_by_task_id(self, button: Button, interaction: Interaction):
+        await interaction.response.send_modal(SearchByTaskID(interaction, True))
+
+    async def go_to_first_page(self, payload=None):
+        print('go_to_first_page',self.current_page)
+        check = await self.check_buttons(0)
+        self.im_doing_done.disabled = check[0]
+        self.im_doing_cancel.disabled = check[1]
+        await self.show_page(0)
+
+    async def go_to_previous_page(self, payload=None):
+        print('go_to_previous_page',self.current_page)
+        if self.current_page >= 0:
+            print('gtpp+')
+            check = await self.check_buttons(self.current_page - 1)
+            print(check)
+            self.im_doing_done.disabled = check[0]
+            self.im_doing_cancel.disabled = check[1]
+            # print('00012',self.accept_button.disabled)
+        await self.show_page(self.current_page - 1)
+        # print('00013',self.accept_button.disabled)
+
+    async def go_to_next_page(self, payload=None):
+        print('go_to_next_page',self.current_page)
+        if self.current_page != self.source.get_max_pages():
+            print('gtnp+')
+            check = await self.check_buttons(self.current_page + 1)
+            print(check)
+            self.im_doing_done.disabled = check[0]
+            self.im_doing_cancel.disabled = check[1]
+        await self.show_page(self.current_page + 1)
+
+    async def go_to_last_page(self, payload=None):
+        print('go_to_first_page',self.current_page)
+        check = await self.check_buttons(self._source.get_max_pages() - 1)
+        self.im_doing_done.disabled = check[0]
+        self.im_doing_cancel.disabled = check[1]
+        await self.show_page(self._source.get_max_pages() - 1)
 
 
 class ImDoing(View):
@@ -774,7 +991,7 @@ class ImDoing(View):
                                 guild: Guild = interaction.client.get_guild(sql_guild['guild_id'])
                                 print('guild is', guild)
                                 channel = guild.get_channel(sql_guild['task_channel_id'])
-                                thread_ = await channel.create_thread(name=f'{is_global+" "}#{sql_count_tasks["max"]}'
+                                thread_ = await channel.create_thread(name=f'{is_global+" "}#{sql_count_tasks["last_value"]}'
                                                                           f' {item} - {interaction.user.display_name}',
                                                                      embed=embed)
                                 forum_tags = [ForumTag(name='Глобальные заказы', id=sql_guild['task_tag_global_id']),
@@ -793,7 +1010,7 @@ class ImDoing(View):
                             print('1')
                             sql_guild = sql.get_guild(interaction.guild.id)
                             channel = interaction.guild.get_channel(sql_guild['task_channel_id'])
-                            thread = await channel.create_thread(name=f'{is_global+" "}#{sql_count_tasks["max"]}'
+                            thread = await channel.create_thread(name=f'{is_global+" "}#{sql_count_tasks["last_value"]}'
                                                                       f' {item} - {interaction.user.display_name}',
                                                                  embed=embed)
                             forum_tags = [ForumTag(name='Ожидают', id=sql_guild['task_tag_waiting_id'])]
@@ -825,17 +1042,56 @@ class ImDoing(View):
 
     @button(label='Глобальное задание', custom_id='new_task_global_status', style=ButtonStyle.gray, emoji='🌐', row=1)
     async def new_task_global_status(self, button: Button, interaction: Interaction):
-        for embed in interaction.message.embeds:
-            if embed.title.endswith('🌐'):
-                embed.title = embed.title.split(' 🌐', 1)[0]
-            else:
-                embed.title = f'{embed.title} 🌐'
-            await interaction.edit(embed=embed)
+        await interaction.send(ephemeral=True, content='in dev...')
+        # for embed in interaction.message.embeds:
+        #     if embed.title.endswith('🌐'):
+        #         embed.title = embed.title.split(' 🌐', 1)[0]
+        #     else:
+        #         embed.title = f'{embed.title} 🌐'
+        #     await interaction.edit(embed=embed)
 
     @button(label='Назад', custom_id='new_task_back', style=ButtonStyle.blurple, emoji='⬅️', row=2)
     async def new_task_back(self, button: Button, interaction: Interaction):
         pass
 
+
+class SearchByTaskID(Modal):
+    def __init__(self, interaction: Interaction, is_customer: bool):
+        title = f'Поиск по номеру.'
+        self.interaction = interaction
+        self.is_customer = is_customer
+        super().__init__(title=title, timeout=None)
+        # self.add_item(TextInput(
+        #
+        # ))
+        self.task_id = TextInput(
+            label='Номер задания:',
+            style=TextInputStyle.short,
+            required=True,
+            max_length=3)
+        self.add_item(self.task_id)
+
+    async def callback(self, interaction: Interaction):
+        try:
+            task_id = int(self.task_id.value)
+        except:
+            await interaction.send(ephemeral=True, content='Номер задания должно быть числом.')
+        else:
+            sql_task = sql.get_task_by_task_id(task_id)
+            print(sql_task)
+            print(type(sql_task))
+            sql_task: dict = sql_task
+            print(sql_task)
+            print(type(sql_task))
+            if sql_task:
+                for x in sql_task:
+                    if self.is_customer and x['customer_id'] == interaction.user.id:
+                        pages = TasksPages(source=TasksListPages(sql_task), user=interaction.user)
+                        await pages.start(interaction=interaction, ephemeral=True)
+                    elif self.is_customer is False and x['contactor_id'] == interaction.user.id:
+                        pass
+            else:
+                await interaction.send('Задания с таким ID нету.', ephemeral=True)
 
 class NewTaskModal(Modal):
     def __init__(self, interaction: Interaction):

@@ -8,12 +8,14 @@ from sys import exc_info
 
 
 async def module_callback(interaction: Interaction):
+    from main_buttons import BotPanelButtons
+    await interaction.edit(view=BotPanelButtons())
     from handler import update_applications_panel
-    sql_recruiting = sql.get_requests(interaction.guild.id)
+    get_guild = sql.get_requests(interaction.guild.id)
     embeds = [await update_applications_panel(interaction.client, interaction.guild)]
     from modules.requests.buttons import ApplicationToCityButtons, CreateRecruiting
-    if sql_recruiting:
-        await interaction.response.send_message(embeds=embeds,
+    if get_guild['requests_channel_id']:
+        await interaction.send(embeds=embeds,
                                                 view=ApplicationToCityButtons(interaction=interaction),
                                                 ephemeral=True)
         #  TODO

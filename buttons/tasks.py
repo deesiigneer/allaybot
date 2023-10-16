@@ -299,7 +299,7 @@ class TasksDone(View):
                 guild = interaction.client.get_guild(sql_guild['guild_id'])
                 for thread in guild.threads:
                     # TODO: check solo task
-                    if thread.name.startswith(f"🌐 #{task_id} {sql_task['item']}"):
+                    if thread.name.startswith(f"🌐 #{task_id+1} {sql_task['item']}"):
                         print('some checks:', interaction.channel_id, thread.id)
                         forum_tags = [ForumTag(name='Глобальный', id=sql_guild['task_tag_global_id']),
                             ForumTag(name='Ожидают', id=sql_guild['task_tag_in_progress_id'])]

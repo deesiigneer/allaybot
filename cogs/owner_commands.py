@@ -6,7 +6,7 @@ import nextcord
 from nextcord.ext.commands.bot import Bot
 from nextcord import Interaction, Embed, Colour, slash_command, Status, SlashOption, ActivityType, Activity,\
     ChannelType, ForumTag, ChannelFlags
-from nextcord.ext import commands
+from nextcord.ext import commands, application_checks
 from nextcord.user import ClientUser
 from database import sql
 
@@ -37,13 +37,30 @@ class OwnerCommands(commands.Cog):
     @slash_command(name='test_command', description='test', guild_ids=[850091193190973472, 1102196413233905696],
                    default_member_permissions=8)
     async def test_command(self, interaction: Interaction):
-        thread = interaction.guild.get_thread(1120326850099556423)
-        async for message in thread.history(limit=100, oldest_first=True):
-            print(message)
-            if message.author == self.bot.user:
-                print('1')
-                from buttons.tasks import TasksChoice
-                await message.edit(view=TasksChoice())
+        from handler import check_permissions
+        pe = await check_permissions(interaction, send_messages=True, manage_roles=True)
+        if pe:
+            await interaction.send(ephemeral=True, content='123')
+        else:
+            await interaction.send(ephemeral=True, content='456')
+
+    @slash_command(name='update', description='Публикация обновлений бота на всех серверах в панели, где есть бот.', guild_ids=[850091193190973472, 1102196413233905696])
+    @application_checks.is_owner()
+    async def bot_update(self, interaction: Interaction):
+        guilds = sql.get_guilds()
+        for sqL_guild in guilds:
+            print(f'guild = {sqL_guild}')
+            guild = interaction.client.get_guild(sqL_guild['guild_id'])
+            channel = guild.get_channel(sqL_guild['panel_channel_id'])
+            from handler import update_panel, Check
+            # await Check(interaction.client, interaction.guild).comparison_database_to_guild(interaction, channel,
+            #                                                                                 interaction.message)
+            await update_panel(interaction.client, guild)
+            from buttons.general import BotPanelButtons
+            message = await channel.fetch_message(sqL_guild['panel_message_id'])
+            await message.edit(view=BotPanelButtons())
+            # await interaction.edit(embeds=embeds, view=BotPanelButtons())
+
 
     @slash_command(name='sub', description='test', guild_ids=[850091193190973472, 1102196413233905696],
                    default_member_permissions=8)

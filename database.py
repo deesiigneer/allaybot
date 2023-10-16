@@ -160,12 +160,12 @@ class Database(object):
         self.cur.execute("""
         SELECT * FROM tasks WHERE task_id = %s""",
                          [task_id])
-        return self.cur.fetchone()
+        return dict(self.cur.fetchone())
 
     @retry
     def get_tasks_count(self):
         self.cur.execute("""
-        SELECT MAX(task_id) FROM tasks """)
+        SELECT last_value FROM tasks_task_id_seq""")
         return self.cur.fetchone()
 
     @retry
@@ -208,13 +208,12 @@ class Database(object):
         return self.connection.commit()
 
     @retry
-    def add_recruiting(self, guild_id: int, recruiting_channel_id: int, recruiting_message_id: int,
-                       resume_channel_id: int, status: bool):
+    def add_recruiting(self, guild_id: int, requests_channel_id: int, requests_message_id: int, status: bool):
         self.cur.execute("""
         INSERT INTO requests
-        (guild_id, recruiting_channel_id, recruiting_message_id, resume_channel_id, status)
-        VALUES (%s, %s, %s, %s, %s)""",
-                         [guild_id, recruiting_channel_id, recruiting_message_id, resume_channel_id, status])
+        (guild_id, requests_channel_id, requests_message_id, status)
+        VALUES (%s, %s, %s, %s)""",
+                         [guild_id, requests_channel_id, requests_message_id, status])
         return self.connection.commit()
 
     @retry
@@ -233,8 +232,8 @@ class Database(object):
         self.cur.execute("""
         INSERT INTO tasks
         (customer_guild_id, customer_id, customer_thread_id, item, description,
-        price, global_status, customer_thread_message_id)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
+        price, global_status, customer_thread_message_id, status)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'waiting')""",
                          [guild_id, customer_id, customer_thread_id, item, description, price, global_status,
                           customer_thread_message_id])
         return self.connection.commit()
@@ -299,14 +298,13 @@ class Database(object):
         return self.connection.commit()
 
     @retry
-    def update_recruiting(self, guild_id: int, recruiting_channel_id: int, recruiting_message_id: int,
-                          resume_channel_id: int, status: bool):
+    def update_recruiting(self, guild_id: int, recruiting_channel_id: int, recruiting_message_id: int, status: bool):
         self.cur.execute("""
         UPDATE requests 
-        SET recruiting_channel_id = %s, recruiting_message_id = %s, resume_channel_id = %s, status = %s
+        SET requests_channel_id = %s, requests_message_id = %s, status = %s
         WHERE guild_id = %s
         """,
-                         [recruiting_channel_id, recruiting_message_id, resume_channel_id, status, guild_id])
+                         [recruiting_channel_id, recruiting_message_id, status, guild_id])
         return self.connection.commit()
 
     @retry
@@ -361,11 +359,34 @@ class Database(object):
                            contactor_thread_message_id: int, customer_thread_id: int):
         self.cur.execute("""
         UPDATE tasks
-        SET contactor_id = %s, contactor_thread_id = %s,  contactor_guild_id = %s, contactor_thread_message_id = %s
+        SET contactor_id = %s, contactor_thread_id = %s,  contactor_guild_id = %s, contactor_thread_message_id = %s, status = 'in-progress'
         WHERE customer_thread_id = %s 
         """,
                          [contactor_id, contactor_thread_id, contactor_guild_id, contactor_thread_message_id,
                           customer_thread_id])
+        return self.connection.commit()
+
+    @retry
+    def remove_contactor(self, task_id: int):
+        self.cur.execute("""
+        UPDATE tasks
+        SET 
+        contactor_id = NULL,
+        contactor_thread_id = NULL,
+        contactor_guild_id = NULL,
+        contactor_thread_message_id = NULL,
+        status = 'waiting'
+        WHERE task_id = %s 
+        """, [task_id])
+        return self.connection.commit()
+
+    @retry
+    def task_done(self, task_id: int):
+        self.cur.execute("""
+        UPDATE tasks
+        SET status = 'done'
+        WHERE task_id = %s 
+        """, [task_id])
         return self.connection.commit()
 
     @retry
@@ -404,6 +425,15 @@ class Database(object):
         AND field_row = %s
         """,
                          [guild_id, row])
+        return self.connection.commit()
+
+    @retry
+    def delete_task(self, task_id: int):
+        self.cur.execute("""
+        DELETE FROM tasks 
+        WHERE task_id = %s 
+        """,
+                         [task_id])
         return self.connection.commit()
 
     @retry

@@ -22,7 +22,7 @@ class ButtonRecruiting(View):
     @button(label='Оставить заявку', emoji='👋', style=ButtonStyle.green, row=1, custom_id='recruiting_to_city')
     async def recruiting_to_city(self, button: Button, interaction: Interaction):
         from handler import check_user_pass
-        if await check_user_pass(interaction.user):
+        if await check_user_pass(interaction.user) or sql.get_user(interaction.user.id):
             await interaction.response.send_modal(RecruitingModal(guild=interaction.guild,
                                                                   preview=False,
                                                                   interaction=interaction))
@@ -74,8 +74,7 @@ class CreateRecruiting(View):
                                                                                              send_messages=False)})
                 recruiting_message = await recruiting_channel.send(embed=embed,
                                                                    view=ButtonRecruiting(interaction.guild))
-                sql.add_recruiting(interaction.guild.id, recruiting_channel.id, recruiting_message.id.id,
-                                   False)
+                sql.add_recruiting(interaction.guild.id, recruiting_channel.id, recruiting_message.id, False)
                 sql_resume = sql.get_resume_fields_order_by_row(interaction.guild.id)
                 print('sql_resume', sql_resume)
                 if not sql_resume:
@@ -83,6 +82,10 @@ class CreateRecruiting(View):
                 await recruiting_message.edit(view=ButtonRecruiting(interaction.guild))
                 invite = await recruiting_channel.create_invite()
                 print(invite.code)
+                sql.update_recruiting(guild_id=interaction.guild.id,
+                                      recruiting_channel_id=recruiting_channel.id,
+                                      recruiting_message_id=recruiting_message.id,
+                                      status=False)
                 sql.update_invite(guild_id=interaction.guild.id, invite=invite.code)
                 await interaction.send(f'Были созданы каналы:\n'
                                        f'{recruiting_channel.mention} - о городе, где находится кнопка для подачи '
@@ -155,7 +158,6 @@ class ApplicationToCityButtons(View):
         sql.update_recruiting(guild_id=interaction.guild.id,
                               recruiting_channel_id=self.sql_recruiting['requests_channel_id'],
                               recruiting_message_id=self.sql_recruiting['requests_message_id'],
-                              resume_channel_id=self.sql_recruiting['resume_channel_id'],
                               status=False if bool(self.sql_recruiting['status']) is True else True)
         from handler import update_panel, update_applications_panel
         if self.sql_recruiting is not None and self.sql_recruiting['status'] is True:
@@ -465,10 +467,13 @@ class RecruitingModal(Modal):
                                                'Проверить статус API можно тут -'
                                                'https://uptime.deesiigneer.ru/status/spworlds')
             else:
+                private = sql.get_requests(interaction.guild.id)['private']
                 thread = await interaction.channel.create_thread(
                     name=f'Заявка-{interaction.user.display_name}',
                     invitable=False,
-                    type=ChannelType.private_thread if sql.get_requests(interaction.guild.id)['private'] is True else ChannelType.public_thread)
+                    type=ChannelType.public_thread if private is False else ChannelType.private_thread)
+                if private is None or private is False:
+                    await channel.last_message.delete(delay=0.5)
                 await thread.add_user(interaction.user)
                 await message.edit(f'{interaction.user.mention}, ваша заявка была отправлена!\n'
                                        f'Все действия по вашей заявке вы всегда можете посмотреть тут -> {thread.jump_url}')
