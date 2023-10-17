@@ -30,7 +30,7 @@ class OwnerCommands(commands.Cog):
                 # await Check(interaction.client, interaction.guild).comparison_database_to_guild(interaction, channel,
                 #                                                                                 interaction.message)
                 await update_panel(interaction.client, guild)
-                from buttons.general import BotPanelButtons
+                from main_buttons import BotPanelButtons
                 message = await channel.fetch_message(sqL_guild['panel_message_id'])
                 await message.edit(view=BotPanelButtons())
                 # await interaction.edit(embeds=embeds, view=BotPanelButtons())
@@ -57,7 +57,7 @@ class OwnerCommands(commands.Cog):
             # await Check(interaction.client, interaction.guild).comparison_database_to_guild(interaction, channel,
             #                                                                                 interaction.message)
             await update_panel(interaction.client, guild)
-            from buttons.general import BotPanelButtons
+            from main_buttons import BotPanelButtons
             message = await channel.fetch_message(sqL_guild['panel_message_id'])
             await message.edit(view=BotPanelButtons())
             # await interaction.edit(embeds=embeds, view=BotPanelButtons())

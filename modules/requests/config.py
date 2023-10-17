@@ -14,7 +14,7 @@ async def module_callback(interaction: Interaction):
     get_guild = sql.get_requests(interaction.guild.id)
     embeds = [await update_applications_panel(interaction.client, interaction.guild)]
     from modules.requests.buttons import ApplicationToCityButtons, CreateRecruiting
-    if get_guild['requests_channel_id']:
+    if get_guild:
         await interaction.send(embeds=embeds,
                                                 view=ApplicationToCityButtons(interaction=interaction),
                                                 ephemeral=True)
