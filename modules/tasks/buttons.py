@@ -205,34 +205,31 @@ class TasksAccept(View):
             _embed.set_footer(text=footer_text, icon_url=avatar_url)
             print('3333', _embed.footer.text)
             self.disabled = True
-            sql_guilds: dict = sql.get_guilds()
-            print("guilds", type(sql_guilds), sql_guilds)
-            for sql_guild in sql_guilds:
-                guild = interaction.client.get_guild(sql_guild['guild_id'])
-                for thread in guild.threads:
-                    # TODO: check solo task
-                    print(f"#{sql_task['task_id']} {sql_task['item']}")
-                    if thread.name.startswith(f"🌐 #{sql_task['task_id']} {sql_task['item']}"):
-                        print('th name',thread.name)
-                        forum_tags = [ForumTag(name='Глобальный', id=sql_guild['task_tag_global_id']),
-                            ForumTag(name='Ожидают', id=sql_guild['task_tag_in_progress_id'])]
-                        await thread.edit(applied_tags=forum_tags)
-                        async for message in thread.history(limit=10, oldest_first=True):
-                            if message.author == interaction.client.user and message.content == '':
-                                print('yes')
-                                print(_embed.footer.text)
-                                print(button.disabled)
-                                print(self.disabled)
-                                button.disabled = True
-                                print(button.disabled)
-                                await message.edit(embed=_embed, view=self)
-                    elif thread.name.startswith(f"#{sql_task['task_id']-1} {sql_task['item']}"):
-                        thread = interaction.channel
-                        print('solo')
-                        forum_tags = [ForumTag(name='Ожидают', id=sql_guild['task_tag_in_progress_id'])]
-                        await thread.edit(applied_tags=forum_tags)
-                        button.disabled = True
-                        await interaction.edit(embed=_embed, view=self)
+            sql_guild = sql.get_guild(interaction.guild.id)
+            for thread in interaction.guild.threads:
+                # TODO: check solo task
+                print(f"#{sql_task['task_id']} {sql_task['item']}")
+                if thread.name.startswith(f"🌐 #{sql_task['task_id']} {sql_task['item']}"):
+                    print('th name',thread.name)
+                    forum_tags = [ForumTag(name='Глобальный', id=sql_guild['task_tag_global_id']),
+                        ForumTag(name='Ожидают', id=sql_guild['task_tag_in_progress_id'])]
+                    await thread.edit(applied_tags=forum_tags)
+                    async for message in thread.history(limit=10, oldest_first=True):
+                        if message.author == interaction.client.user and message.content == '':
+                            print('yes')
+                            print(_embed.footer.text)
+                            print(button.disabled)
+                            print(self.disabled)
+                            button.disabled = True
+                            print(button.disabled)
+                            await message.edit(embed=_embed, view=self)
+                elif thread.name.startswith(f"#{sql_task['task_id']-1} {sql_task['item']}"):
+                    thread = interaction.channel
+                    print('solo')
+                    forum_tags = [ForumTag(name='Ожидают', id=sql_guild['task_tag_in_progress_id'])]
+                    await thread.edit(applied_tags=forum_tags)
+                    button.disabled = True
+                    await interaction.edit(embed=_embed, view=self)
 
             sql.update_task_accept(interaction.user.id,
                                    interaction.channel.id,
