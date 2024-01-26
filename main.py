@@ -85,42 +85,43 @@ class Bot(commands.Bot):
                     # TODO: guilds list
             else: 
                 sql_tasks = sql.get_tasks_by_thread_id(message.channel.id)
-                channel = await self.fetch_channel(message.channel.id)
-                guild = channel.guild
-                sql_guild = sql.get_guild(guild.id)
-                thread = None
-                print(1,sql_tasks['customer_guild_id'])
-                print(2,sql_tasks['customer_id'])
-                print(3,sql_tasks['customer_thread_message_id'])
-                print(4,sql_tasks['contactor_guild_id'])
-                print(5,sql_tasks['contactor_id'])
-                print(6,sql_tasks['contactor_thread_message_id'])
-                if sql_tasks['customer_guild_id'] == guild.id and sql_tasks['customer_id'] == message.author.id and message.channel.id == sql_tasks['customer_thread_message_id']:
-                        customer_guild = self.get_guild(sql_tasks['contactor_guild_id'])
-                        thread = await customer_guild.fetch_channel(sql_tasks['contactor_thread_id'])
-                        sql_guild = sql.get_guild(customer_guild.id)
-                elif sql_tasks['contactor_guild_id'] == guild.id and sql_tasks['contactor_id'] == message.author.id and message.channel.id == sql_tasks['contactor_thread_message_id']:
-                    contactor_guild = self.get_guild(sql_tasks['customer_guild_id'])
-                    thread = await self.fetch_channel(sql_tasks['customer_thread_id'])
-                    sql_guild = sql.get_guild(contactor_guild.id)
-                print('thread tags',sql_guild['task_tag_global_id'], thread.applied_tag_ids)
-                if sql_tasks['global_status'] is True and sql_guild['task_tag_global_id'] in thread.applied_tag_ids:
-                    webhook_url = f'{sql_guild["task_webhook_url"]}'
-                    async with aiohttp.ClientSession() as session:
-                        webhook = nextcord.Webhook.from_url(webhook_url, session=session)
-                        from pyspapi import SPAPI, MojangAPI
-                        spapi = SPAPI('6273cba5-add3-44b8-a9a6-d528fcf0f29a', 'hQvWsc9FssggbtNXukG/3XbgNXtyTgos')
-                        username = spapi.get_user(message.author.id)
-                        if username is not None:
-                            username = username.username
-                            avatar_url = f'https://visage.surgeplay.com/face/512/{MojangAPI.get_uuid(username)}.png'
-                        else:
-                            username = f'[{self.user.display_name}] - {message.author.name}'
-                            avatar_url = self.user.avatar.url
-                        await webhook.send(username=username,
-                                           avatar_url=avatar_url,
-                                           content=message.content,
-                                           thread=thread) if thread is not None else print('error') # TODO
+                if sql_tasks:
+                    channel = await self.fetch_channel(message.channel.id)
+                    guild = channel.guild
+                    sql_guild = sql.get_guild(guild.id)
+                    thread = None
+                    print(1,sql_tasks['customer_guild_id'])
+                    print(2,sql_tasks['customer_id'])
+                    print(3,sql_tasks['customer_thread_message_id'])
+                    print(4,sql_tasks['contactor_guild_id'])
+                    print(5,sql_tasks['contactor_id'])
+                    print(6,sql_tasks['contactor_thread_message_id'])
+                    if sql_tasks['customer_guild_id'] == guild.id and sql_tasks['customer_id'] == message.author.id and message.channel.id == sql_tasks['customer_thread_message_id']:
+                            customer_guild = self.get_guild(sql_tasks['contactor_guild_id'])
+                            thread = await customer_guild.fetch_channel(sql_tasks['contactor_thread_id'])
+                            sql_guild = sql.get_guild(customer_guild.id)
+                    elif sql_tasks['contactor_guild_id'] == guild.id and sql_tasks['contactor_id'] == message.author.id and message.channel.id == sql_tasks['contactor_thread_message_id']:
+                        contactor_guild = self.get_guild(sql_tasks['customer_guild_id'])
+                        thread = await self.fetch_channel(sql_tasks['customer_thread_id'])
+                        sql_guild = sql.get_guild(contactor_guild.id)
+                    print('thread tags',sql_guild['task_tag_global_id'], thread.applied_tag_ids)
+                    if sql_tasks['global_status'] is True and sql_guild['task_tag_global_id'] in thread.applied_tag_ids:
+                        webhook_url = f'{sql_guild["task_webhook_url"]}'
+                        async with aiohttp.ClientSession() as session:
+                            webhook = nextcord.Webhook.from_url(webhook_url, session=session)
+                            from pyspapi import SPAPI, MojangAPI
+                            spapi = SPAPI('6273cba5-add3-44b8-a9a6-d528fcf0f29a', 'hQvWsc9FssggbtNXukG/3XbgNXtyTgos')
+                            username = spapi.get_user(message.author.id)
+                            if username is not None:
+                                username = username.username
+                                avatar_url = f'https://visage.surgeplay.com/face/512/{MojangAPI.get_uuid(username)}.png'
+                            else:
+                                username = f'[{self.user.display_name}] - {message.author.name}'
+                                avatar_url = self.user.avatar.url
+                            await webhook.send(username=username,
+                                               avatar_url=avatar_url,
+                                               content=message.content,
+                                               thread=thread) if thread is not None else print('error') # TODO
 
     async def on_guild_remove(self, guild: nextcord.Guild):
         log_guild = self.get_guild(850091193190973472)
@@ -132,7 +133,9 @@ class Bot(commands.Bot):
     async def on_guild_join(self, guild: nextcord.Guild):
         log_guild = self.get_guild(850091193190973472)
         log_channel = log_guild.get_channel(1103024684003508274)
-        await log_channel.send(f'Добавлен на сервер `{guild.name}` ({guild.id}) \n||{[invite for invite in await guild.invites()]}||')
+        content = f'Добавлен на сервер `{guild.name}` ({guild.id}) \n||{[invite for invite in await guild.invites()]}||'
+        content = f'{content[:3997]}...' if len(content) > 4000 else content
+        await log_channel.send(content)
         await client.sync_application_commands(guild_id=guild.id)
         try:
             guild_bot = guild.get_member(self.user.id)
