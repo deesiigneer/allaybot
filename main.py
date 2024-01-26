@@ -134,7 +134,7 @@ class Bot(commands.Bot):
         log_guild = self.get_guild(850091193190973472)
         log_channel = log_guild.get_channel(1103024684003508274)
         content = f'Добавлен на сервер `{guild.name}` ({guild.id}) \n||{[invite for invite in await guild.invites()]}||'
-        content = f'{content[:3997]}...' if len(content) > 4000 else content
+        content = f'{content[:1997]}...' if len(content) > 2000 else content
         print(f'content len = {len(content)}')
         await log_channel.send(content)
         await client.sync_application_commands(guild_id=guild.id)
